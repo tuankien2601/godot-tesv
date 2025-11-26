@@ -72,15 +72,65 @@ public:
 
 	for (int i = 0; i < header->numSections; i++) {
 		SectionHeader *section = sections[i];
-		auto localFixup = section->absoluteDataStart + section->localFixupsOffset;
-		auto localFixupSize = section->globalFixupsOffset - section->localFixupsOffset;
-		auto globalFixupsOffset
+		auto localFixupsStart = raw_data + section->absoluteDataStart + section->localFixupsOffset;
+		auto localFixupsEnd = localFixupsStart + section->globalFixupsOffset - section->localFixupsOffset;
+		auto globalFixupsStart = raw_data + section->absoluteDataStart + section->globalFixupsOffset;
+    auto globalFixupsEnd = globalFixupsStart + section->virtualFixupsOffset - section->globalFixupsOffset;
+    auto virtualFixupsStart = raw_data + section->absoluteDataStart + section->virtualFixupsOffset;
+    auto virtualFixupsEnd = virtualFixupsStart + section->exportsOffset - section->virtualFixupsOffset;
+
+    if (localFixupsEnd - localFixupsStart > 0) {
+      while (localFixupsStart < localFixupsEnd) {
+        uint32_t offset = *reinterpret_cast<uint32_t *>(localFixupsStart);
+        if (offset == 0xFFFFFFFF) break;
+        uint32_t target = *reinterpret_cast<uint32_t *>(localFixupsStart + 4);
+        offset += section->absoluteDataStart;
+        target += section->absoluteDataStart;
+        fixup(offset, target);
+        localFixupsStart += 8;
+      }
+    }
+
+    if (globalFixupsEnd - globalFixupsStart > 0) {
+      while (globalFixupsStart < globalFixupsEnd) {
+        uint32_t offset = *reinterpret_cast<uint32_t *>(globalFixupsStart);
+        if (offset == 0xFFFFFFFF) break;
+        uint32_t sectionIndex = *reinterpret_cast<uint32_t *>(globalFixupsStart + 4);
+        uint32_t target = *reinterpret_cast<uint32_t *>(globalFixupsStart + 8);
+        offset += section->absoluteDataStart;
+        target += sections[sectionIndex]->absoluteDataStart;
+        fixup(offset, target);
+        globalFixupsStart += 12;
+      }
+    }
+
+    if (virtualFixupsEnd - virtualFixupsStart > 0) {
+      while (virtualFixupsStart < virtualFixupsEnd) {
+        uint32_t offset = *reinterpret_cast<uint32_t *>(virtualFixupsStart);
+        if (offset == 0xFFFFFFFF) break;
+        uint32_t sectionIndex = *reinterpret_cast<uint32_t *>(virtualFixupsStart + 4);
+        uint32_t target = *reinterpret_cast<uint32_t *>(virtualFixupsStart + 8);
+        offset += section->absoluteDataStart;
+        target += sections[sectionIndex]->absoluteDataStart;
+        fixup(offset, target);
+        virtualFixupsStart += 12;
+      }
+    }
 	}
 
   }
 
   private:
-  void fixup() {
-
+  void fixup(size_t offset, size_t target) {
+    if (header->layoutRules.bytesInPointer == 4) {
+			*reinterpret_cast<uint32_t *>(raw_data + offset) = static_cast<uint32_t>(target);
+		}
+		else if (header->layoutRules.bytesInPointer == 8) {
+			*reinterpret_cast<uint64_t *>(raw_data + offset) = static_cast<uint64_t>(target);
+		}
+		else {
+			std::cerr << "Unsupported pointer size: " << static_cast<int>(header->layoutRules.bytesInPointer) << std::endl;
+      std::abort();
+		}
   }
 };
