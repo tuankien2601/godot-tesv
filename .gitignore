@@ -1,3 +1,4 @@
-./android-sdk-install
-./compile_commands.json
-./.sconsign.dblite
+android-sdk-install
+compile_commands.json
+.sconsign.dblite
+.cache/

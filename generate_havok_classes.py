@@ -53,37 +53,105 @@ for type_info in data["typeinfo"]:
     classes[class_name]["vtable"] = type_info["vtable"]
 
 
+def get_dependencies(clazz, classes):
+    """Extract all class dependencies from a class definition."""
+    deps = set()
+    
+    # Add parent class as dependency
+    if clazz.get("parent"):
+        deps.add(clazz["parent"])
+    
+    # Add member type dependencies
+    for member in clazz.get("members", []):
+        member_type = types[member.get("type", 0)]
+        subtype_idx = member.get("subtype", 0)
+        
+        # Check if the member references another class
+        if "class" in member:
+            class_ref = member["class"]
+            if class_ref in classes:
+                deps.add(class_ref)
+        
+        # Handle parameterized types
+        if "{subtype}" in member_type and subtype_idx < len(types):
+            subtype = types[subtype_idx]
+            if subtype in classes:
+                deps.add(subtype)
+    
+    return deps
+
+
+def topological_sort(classes):
+    """Sort classes in dependency order using topological sort."""
+    visited = set()
+    sorted_classes = []
+    visiting = set()
+    
+    def visit(class_name):
+        if class_name in visited:
+            return
+        if class_name in visiting:
+            # Circular dependency - skip to avoid infinite loop
+            return
+        
+        if class_name not in classes:
+            # External class, mark as visited
+            visited.add(class_name)
+            return
+        
+        visiting.add(class_name)
+        
+        # Visit dependencies first
+        deps = get_dependencies(classes[class_name], classes)
+        for dep in deps:
+            visit(dep)
+        
+        visiting.remove(class_name)
+        visited.add(class_name)
+        sorted_classes.append(classes[class_name])
+    
+    # Visit all classes
+    for class_name in classes:
+        visit(class_name)
+    
+    return sorted_classes
+
+
 def write_members(members, header_file, indent="    "):
     for member in members:
         print(member)
         member_type = types[member.get("type", 0)]
-        subtype = types[member.get("subtype", 0)].format(subtype="", class_name=member.get("class", ""))
+        subtype = types[member.get("subtype", 0)].format(subtype="", class_name=member.get("class", "void"))
         member_type = member_type.format(subtype=subtype, class_name=member.get("class", ""))
         member_name = member["name"]
-        header_file.write(f"{indent}{member_type} {member_name};\n")
+        header_file.write(f"{indent}{member_type} m_{member_name};\n")
 
 
 header_file = open(f"{root_dir}/havok.h", "w")
 header_file.write("#include \"hkBaseTypes.h\"\n\n")
 
-for clazz in classes.values():
+# Sort classes in dependency order
+sorted_classes = topological_sort(classes)
+
+for clazz in sorted_classes:
     has_vtable = clazz.get("vtable", 0) != 0
-    if has_vtable:
-        if clazz["parent"]:
-            header_file.write(f"class {clazz['name']}: public {
-                clazz['parent']} \n")
-        else:
-            header_file.write(
-                f"class {clazz['name']} \n")
-        header_file.write("{\n")
-        header_file.write("public:\n")
-        header_file.write("\n    virtual ~" + clazz['name'] + "();\n")
+    if clazz["parent"]:
+        header_file.write(f"class {clazz['name']}: public {clazz['parent']} \n")
     else:
-        header_file.write(f"struct {clazz['name']} \n")
-        header_file.write("{\n")
-        header_file.write("public:\n")
+        header_file.write(f"class {clazz['name']} \n")
+    header_file.write("{\n")
+    header_file.write("public:\n")
+    if has_vtable:
+        header_file.write("\n    virtual ~" + clazz['name'] + "();\n")
+    
     write_members(clazz["members"], header_file)
     header_file.write("};\n")
+    header_file.write("\n")
 
-
+header_file.write("\n")
+header_file.write("std::map<std::string, typeinfo> typeinfos = {\n")
+for clazz in sorted_classes:
+    vtable = clazz.get("vtable", 0)
+    header_file.write(f'    {{"{clazz["name"]}", {{{vtable}}}}},\n')
+header_file.write("};\n")
 header_file.close()
