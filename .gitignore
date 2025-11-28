@@ -2,3 +2,5 @@ android-sdk-install
 compile_commands.json
 .sconsign.dblite
 .cache/
+*.obj
+demo/

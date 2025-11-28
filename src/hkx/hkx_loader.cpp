@@ -388,3 +388,7 @@ Ref<Animation> HKXLoader::load_animation(PackedByteArray animation_data, PackedB
   return Ref<Animation>();
 }
 
+void HKXLoader::_bind_methods()
+{
+	ClassDB::bind_static_method("HKXLoader", D_METHOD("load_animation", "animation_data", "skeleton_data"), &HKXLoader::load_animation);
+}

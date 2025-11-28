@@ -5,6 +5,7 @@
 #include <godot_cpp/classes/node3d.hpp>
 #include <godot_cpp/classes/object.hpp>
 #include <godot_cpp/core/class_db.hpp>
+#include <unordered_map>
 
 namespace std {
 // Specialize std::hash for godot::StringName

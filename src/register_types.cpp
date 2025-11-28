@@ -3,6 +3,7 @@
 #include "dds/dds_loader.h"
 #include "bsa/bsa.h"
 #include "nif/nif_loader.h"
+#include "hkx/hkx_loader.h"
 #include "resource_manager.h"
 #include "resource_cache.h"
 
@@ -20,6 +21,7 @@ void initialize_tesv_module(ModuleInitializationLevel p_level) {
 	GDREGISTER_RUNTIME_CLASS(DDSLoader);
 	GDREGISTER_RUNTIME_CLASS(NifLoader);
 	GDREGISTER_RUNTIME_CLASS(BSA);
+	GDREGISTER_RUNTIME_CLASS(HKXLoader)
 	GDREGISTER_RUNTIME_CLASS(TESVResourceManager);
 	GDREGISTER_RUNTIME_CLASS(TESVResourceCache);
 }
