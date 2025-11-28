@@ -1,8 +1,8 @@
-#include <memory>
+#ifndef GD_HKX_H
+#define GD_HKX_H
+
 #include <stdint.h>
 #include <iostream>
-#include <fstream>
-#include <filesystem>
 #include <vector>
 #include "havok.h"
 
@@ -162,3 +162,5 @@ private:
 		}
 	}
 };
+
+#endif
