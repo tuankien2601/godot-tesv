@@ -7,7 +7,7 @@
 
 template <typename T> class NURBS {
 public:
-  NURBS(std::vector<T> controlPoints, std::vector<uint8_t> knots,
+  NURBS(std::vector<T> controlPoints, uint8_t *knots,
         unsigned int degree)
       : _controlPoints(controlPoints), _knots(knots), _degree(degree) {}
 
@@ -72,7 +72,7 @@ private:
 
   unsigned int _degree;
   std::vector<T> _controlPoints;
-  std::vector<uint8_t> _knots;
+  uint8_t *_knots;
 };
 
 #endif

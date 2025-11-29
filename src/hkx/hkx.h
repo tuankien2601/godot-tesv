@@ -149,11 +149,11 @@ private:
 	{
 		if (header->layoutRules.bytesInPointer == 4)
 		{
-			*reinterpret_cast<uint32_t *>(raw_data + offset) = static_cast<uint32_t>(target);
+			*reinterpret_cast<uint32_t *>(raw_data + offset) = static_cast<uint32_t>(reinterpret_cast<uintptr_t>(raw_data + target));
 		}
 		else if (header->layoutRules.bytesInPointer == 8)
 		{
-			*reinterpret_cast<uint64_t *>(raw_data + offset) = static_cast<uint64_t>(target);
+			*reinterpret_cast<uint64_t *>(raw_data + offset) = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(raw_data + target));
 		}
 		else
 		{
