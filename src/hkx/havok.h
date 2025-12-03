@@ -1,9 +1,11 @@
 #ifndef HAVOK_H
 #define HAVOK_H
 
+#include <functional>
+#include <iostream>
 #include <map>
 #include <string>
-#include <functional>
+#include <cstring>
 
 typedef char *hkStringPtr;
 typedef unsigned long long uint64;
@@ -19,7973 +21,9375 @@ typedef unsigned short hkHalf;
 
 class hkClass;
 
-struct hkVariant
-{
-	void *m_object;
-	hkClass *m_class;
+struct hkVariant {
+  void *m_object;
+  hkClass *m_class;
 };
 
-struct hkVector3
-{
-	float x, y, z;
+struct hkVector3 {
+  float x, y, z;
 };
 
-struct hkVector4
-{
-	float x, y, z, w;
+struct hkVector4 {
+  float x, y, z, w;
 };
 
-struct hkMatrix3
-{
-	struct hkVector4 col0; // 00
-	struct hkVector4 col1; // 10
-	struct hkVector4 col2; // 20
+struct hkMatrix3 {
+  struct hkVector4 col0; // 00
+  struct hkVector4 col1; // 10
+  struct hkVector4 col2; // 20
 };
 
-struct hkMatrix4
-{
-	struct hkVector4 col0;
-	struct hkVector4 col1;
-	struct hkVector4 col2;
-	struct hkVector4 col3;
+struct hkMatrix4 {
+  struct hkVector4 col0;
+  struct hkVector4 col1;
+  struct hkVector4 col2;
+  struct hkVector4 col3;
 };
 
-struct hkMatrix3x4
-{
-	float cr[3][4];
+struct hkMatrix3x4 {
+  float cr[3][4];
 };
 
-struct hkRotation : hkMatrix3
-{
+struct hkRotation : hkMatrix3 {};
+
+struct hkQuaternion {
+  float x, y, z, w;
 };
 
-struct hkQuaternion
-{
-	float x, y, z, w;
+struct hkTransform {
+  struct hkMatrix3x4 rotation;
+  struct hkVector4 translation;
 };
 
-struct hkTransform
-{
-	struct hkMatrix3x4 rotation;
-	struct hkVector4 translation;
+struct hkQsTransform {
+  struct hkVector4 translation;
+  struct hkQuaternion rotation;
+  struct hkVector4 scale;
 };
 
-struct hkQsTransform
-{
-	struct hkVector4 translation;
-	struct hkQuaternion rotation;
-	struct hkVector4 scale;
-};
-
-template <typename T>
-class hkArrayBase
-{
+template <typename T> class hkArrayBase {
 public:
-	T *data;
-	int32 size;
-	int32 capacityAndFlags;
+  T *data;
+  int32 size;
+  int32 capacityAndFlags;
 
-	template <typename PtrType>
-	class Iterator
-	{
-	public:
-		// Required type aliases
-		using value_type = T;
-		using difference_type = std::ptrdiff_t;
-		using pointer = PtrType;
-		using reference = typename std::iterator_traits<PtrType>::reference;
-		using iterator_category = std::forward_iterator_tag;
+  template <typename PtrType> class Iterator {
+  public:
+    // Required type aliases
+    using value_type = T;
+    using difference_type = std::ptrdiff_t;
+    using pointer = PtrType;
+    using reference = typename std::iterator_traits<PtrType>::reference;
+    using iterator_category = std::forward_iterator_tag;
 
-		Iterator(PtrType ptr) : m_ptr(ptr) {}
+    Iterator(PtrType ptr) : m_ptr(ptr) {}
 
-		// Operators must work with the generic PtrType
-		reference operator*() const { return *m_ptr; }
-		pointer operator->() const { return m_ptr; }
+    // Operators must work with the generic PtrType
+    reference operator*() const { return *m_ptr; }
+    pointer operator->() const { return m_ptr; }
 
-		Iterator &operator++()
-		{
-			m_ptr++;
-			return *this;
-		}
+    Iterator &operator++() {
+      m_ptr++;
+      return *this;
+    }
 
-		Iterator operator++(int)
-		{
-			Iterator temp = *this;
-			m_ptr++;
-			return temp;
-		}
+    Iterator operator++(int) {
+      Iterator temp = *this;
+      m_ptr++;
+      return temp;
+    }
 
-		friend bool operator==(const Iterator &a, const Iterator &b) { return a.m_ptr == b.m_ptr; }
-		friend bool operator!=(const Iterator &a, const Iterator &b) { return a.m_ptr != b.m_ptr; }
+    friend bool operator==(const Iterator &a, const Iterator &b) {
+      return a.m_ptr == b.m_ptr;
+    }
+    friend bool operator!=(const Iterator &a, const Iterator &b) {
+      return a.m_ptr != b.m_ptr;
+    }
 
-		// Optional: Allows conversion from Iterator<T*> to Iterator<const T*>
-		operator Iterator<const T *>() const
-		{
-			return Iterator<const T *>(m_ptr);
-		}
+    // Optional: Allows conversion from Iterator<T*> to Iterator<const T*>
+    operator Iterator<const T *>() const { return Iterator<const T *>(m_ptr); }
 
-	private:
-		PtrType m_ptr;
-	};
+  private:
+    PtrType m_ptr;
+  };
 
-	// Define standard iterator type aliases for the container
-	using iterator = Iterator<T *>;
-	using const_iterator = Iterator<const T *>;
+  // Define standard iterator type aliases for the container
+  using iterator = Iterator<T *>;
+  using const_iterator = Iterator<const T *>;
 
-	// Provide begin/end methods returning the correct iterator types
-	iterator begin() { return iterator(data.data()); }
-	iterator end() { return iterator(data.data() + data.size()); }
+  // Provide begin/end methods returning the correct iterator types
+  iterator begin() { return iterator(data); }
+  iterator end() { return iterator(data + size * sizeof(T)); }
 
-	const_iterator begin() const { return const_iterator(data.data()); }
-	const_iterator end() const { return const_iterator(data.data() + data.size()); }
-	const_iterator cbegin() const { return const_iterator(data.data()); }
-	const_iterator cend() const { return const_iterator(data.data() + data.size()); }
+  const_iterator begin() const { return const_iterator(data); }
+  const_iterator end() const { return const_iterator(data + size * sizeof(T)); }
+  const_iterator cbegin() const { return const_iterator(data); }
+  const_iterator cend() const {
+    return const_iterator(data + size * sizeof(T));
+  }
 };
 
 template <typename T, typename Allocator = void>
-class hkArray : public hkArrayBase<T>
-{
-};
+class hkArray : public hkArrayBase<T> {};
 
 template <typename T, int N, typename Allocator = void>
-class hkInplaceArray : public hkArray<T, Allocator>
-{
+class hkInplaceArray : public hkArray<T, Allocator> {
 public:
-	T storage[N];
+  T storage[N];
 };
 
-class hkBaseObject
-{
+class hkBaseObject {
 public:
-	virtual ~hkBaseObject();
+  virtual ~hkBaseObject();
 };
 
-class hkReferencedObject : public hkBaseObject
-{
+class hkReferencedObject : public hkBaseObject {
 public:
-	virtual ~hkReferencedObject();
-	uint16 m_memSizeAndFlags;
-	int16 m_referenceCount;
+  virtual ~hkReferencedObject();
+  uint16 m_memSizeAndFlags;
+  int16 m_referenceCount;
 };
 
-class hkLocalFrameGroup : public hkReferencedObject
-{
+class hkLocalFrameGroup : public hkReferencedObject {
 public:
-	virtual ~hkLocalFrameGroup();
-	hkStringPtr m_name;
+  virtual ~hkLocalFrameGroup();
+  hkStringPtr m_name;
 };
 
-class hkLocalFrame : public hkReferencedObject
-{
+class hkLocalFrame : public hkReferencedObject {
 public:
 };
 
-class hkSimpleLocalFrame : public hkLocalFrame
-{
+class hkSimpleLocalFrame : public hkLocalFrame {
 public:
-	virtual ~hkSimpleLocalFrame();
-	hkTransform m_transform;
-	hkArray<hkLocalFrame *> m_children;
-	hkLocalFrame *m_parentFrame;
-	hkLocalFrameGroup *m_group;
-	hkStringPtr m_name;
+  virtual ~hkSimpleLocalFrame();
+  hkTransform m_transform;
+  hkArray<hkLocalFrame *> m_children;
+  hkLocalFrame *m_parentFrame;
+  hkLocalFrameGroup *m_group;
+  hkStringPtr m_name;
 };
 
-class hkTrackerSerializableScanSnapshotAllocation
-{
+class hkTrackerSerializableScanSnapshotAllocation {
 public:
-	uint64 m_start;
-	uint64 m_size;
-	int32 m_traceId;
+  uint64 m_start;
+  uint64 m_size;
+  int32 m_traceId;
 };
 
-class hkTrackerSerializableScanSnapshotBlock
-{
+class hkTrackerSerializableScanSnapshotBlock {
 public:
-	int32 m_typeIndex;
-	uint64 m_start;
-	uint64 m_size;
-	int32 m_arraySize;
-	int32 m_startReferenceIndex;
-	int32 m_numReferences;
+  int32 m_typeIndex;
+  uint64 m_start;
+  uint64 m_size;
+  int32 m_arraySize;
+  int32 m_startReferenceIndex;
+  int32 m_numReferences;
 };
 
-class hkTrackerSerializableScanSnapshot : public hkReferencedObject
-{
+class hkTrackerSerializableScanSnapshot : public hkReferencedObject {
 public:
-	virtual ~hkTrackerSerializableScanSnapshot();
-	hkArray<hkTrackerSerializableScanSnapshotAllocation> m_allocations;
-	hkArray<hkTrackerSerializableScanSnapshotBlock> m_blocks;
-	hkArray<int32> m_refs;
-	hkArray<uint8> m_typeNames;
-	hkArray<uint8> m_traceText;
-	hkArray<uint64> m_traceAddrs;
-	hkArray<int32> m_traceParents;
+  virtual ~hkTrackerSerializableScanSnapshot();
+  hkArray<hkTrackerSerializableScanSnapshotAllocation> m_allocations;
+  hkArray<hkTrackerSerializableScanSnapshotBlock> m_blocks;
+  hkArray<int32> m_refs;
+  hkArray<uint8> m_typeNames;
+  hkArray<uint8> m_traceText;
+  hkArray<uint64> m_traceAddrs;
+  hkArray<int32> m_traceParents;
 };
 
-class hkMonitorStreamColorTableColorPair
-{
+class hkMonitorStreamColorTableColorPair {
 public:
-	hkStringPtr m_colorName;
-	uint32 m_color;
+  hkStringPtr m_colorName;
+  uint32 m_color;
 };
 
-class hkMonitorStreamColorTable : public hkReferencedObject
-{
+class hkMonitorStreamColorTable : public hkReferencedObject {
 public:
-	virtual ~hkMonitorStreamColorTable();
-	hkArray<hkMonitorStreamColorTableColorPair> m_colorPairs;
-	uint32 m_defaultColor;
+  virtual ~hkMonitorStreamColorTable();
+  hkArray<hkMonitorStreamColorTableColorPair> m_colorPairs;
+  uint32 m_defaultColor;
 };
 
-class hkResourceBase : public hkReferencedObject
-{
+class hkResourceBase : public hkReferencedObject {
 public:
 };
 
-class hkResourceContainer : public hkResourceBase
-{
+class hkResourceContainer : public hkResourceBase {
 public:
 };
 
-class hkMemoryResourceHandleExternalLink
-{
+class hkMemoryResourceHandleExternalLink {
 public:
-	hkStringPtr m_memberName;
-	hkStringPtr m_externalId;
+  hkStringPtr m_memberName;
+  hkStringPtr m_externalId;
 };
 
-class hkResourceHandle : public hkResourceBase
-{
+class hkResourceHandle : public hkResourceBase {
 public:
 };
 
-class hkMemoryResourceHandle : public hkResourceHandle
-{
+class hkMemoryResourceHandle : public hkResourceHandle {
 public:
-	virtual ~hkMemoryResourceHandle();
-	hkReferencedObject *m_variant;
-	hkStringPtr m_name;
-	hkArray<hkMemoryResourceHandleExternalLink> m_references;
+  virtual ~hkMemoryResourceHandle();
+  hkReferencedObject *m_variant;
+  hkStringPtr m_name;
+  hkArray<hkMemoryResourceHandleExternalLink> m_references;
 };
 
-class hkMemoryResourceContainer : public hkResourceContainer
-{
+class hkMemoryResourceContainer : public hkResourceContainer {
 public:
-	virtual ~hkMemoryResourceContainer();
-	hkStringPtr m_name;
-	hkMemoryResourceContainer *m_parent;
-	hkArray<hkMemoryResourceHandle *> m_resourceHandles;
-	hkArray<hkMemoryResourceContainer *> m_children;
+  virtual ~hkMemoryResourceContainer();
+  hkStringPtr m_name;
+  hkMemoryResourceContainer *m_parent;
+  hkArray<hkMemoryResourceHandle *> m_resourceHandles;
+  hkArray<hkMemoryResourceContainer *> m_children;
 };
 
-class hkAlignSceneToNodeOptions : public hkReferencedObject
-{
+class hkAlignSceneToNodeOptions : public hkReferencedObject {
 public:
-	virtual ~hkAlignSceneToNodeOptions();
-	bool m_invert;
-	bool m_transformPositionX;
-	bool m_transformPositionY;
-	bool m_transformPositionZ;
-	bool m_transformRotation;
-	bool m_transformScale;
-	bool m_transformSkew;
-	int32 m_keyframe;
-	hkStringPtr m_nodeName;
+  virtual ~hkAlignSceneToNodeOptions();
+  bool m_invert;
+  bool m_transformPositionX;
+  bool m_transformPositionY;
+  bool m_transformPositionZ;
+  bool m_transformRotation;
+  bool m_transformScale;
+  bool m_transformSkew;
+  int32 m_keyframe;
+  hkStringPtr m_nodeName;
 };
 
-class hkxAnimatedFloat : public hkReferencedObject
-{
+class hkxAnimatedFloat : public hkReferencedObject {
 public:
-	virtual ~hkxAnimatedFloat();
-	hkArray<float> m_floats;
-	uint8 m_hint;
+  virtual ~hkxAnimatedFloat();
+  hkArray<float> m_floats;
+  uint8 m_hint;
 };
 
-class hkxAnimatedMatrix : public hkReferencedObject
-{
+class hkxAnimatedMatrix : public hkReferencedObject {
 public:
-	virtual ~hkxAnimatedMatrix();
-	hkArray<hkMatrix4> m_matrices;
-	uint8 m_hint;
+  virtual ~hkxAnimatedMatrix();
+  hkArray<hkMatrix4> m_matrices;
+  uint8 m_hint;
 };
 
-class hkxAnimatedQuaternion : public hkReferencedObject
-{
+class hkxAnimatedQuaternion : public hkReferencedObject {
 public:
-	virtual ~hkxAnimatedQuaternion();
-	hkArray<hkQuaternion> m_quaternions;
+  virtual ~hkxAnimatedQuaternion();
+  hkArray<hkQuaternion> m_quaternions;
 };
 
-class hkxAnimatedVector : public hkReferencedObject
-{
+class hkxAnimatedVector : public hkReferencedObject {
 public:
-	virtual ~hkxAnimatedVector();
-	hkArray<hkVector4> m_vectors;
-	uint8 m_hint;
+  virtual ~hkxAnimatedVector();
+  hkArray<hkVector4> m_vectors;
+  uint8 m_hint;
 };
 
-class hkxAttribute
-{
+class hkxAttribute {
 public:
-	hkStringPtr m_name;
-	hkReferencedObject *m_value;
+  hkStringPtr m_name;
+  hkReferencedObject *m_value;
 };
 
-class hkxAttributeGroup
-{
+class hkxAttributeGroup {
 public:
-	hkStringPtr m_name;
-	hkArray<hkxAttribute> m_attributes;
+  hkStringPtr m_name;
+  hkArray<hkxAttribute> m_attributes;
 };
 
-class hkxAttributeHolder : public hkReferencedObject
-{
+class hkxAttributeHolder : public hkReferencedObject {
 public:
-	virtual ~hkxAttributeHolder();
-	hkArray<hkxAttributeGroup> m_attributeGroups;
+  virtual ~hkxAttributeHolder();
+  hkArray<hkxAttributeGroup> m_attributeGroups;
 };
 
-class hkxCamera : public hkReferencedObject
-{
+class hkxCamera : public hkReferencedObject {
 public:
-	virtual ~hkxCamera();
-	hkVector4 m_from;
-	hkVector4 m_focus;
-	hkVector4 m_up;
-	float m_fov;
-	float m_far;
-	float m_near;
-	bool m_leftHanded;
+  virtual ~hkxCamera();
+  hkVector4 m_from;
+  hkVector4 m_focus;
+  hkVector4 m_up;
+  float m_fov;
+  float m_far;
+  float m_near;
+  bool m_leftHanded;
 };
 
-class hkxEdgeSelectionChannel : public hkReferencedObject
-{
+class hkxEdgeSelectionChannel : public hkReferencedObject {
 public:
-	virtual ~hkxEdgeSelectionChannel();
-	hkArray<int32> m_selectedEdges;
+  virtual ~hkxEdgeSelectionChannel();
+  hkArray<int32> m_selectedEdges;
 };
 
-class hkxEnumItem
-{
+class hkxEnumItem {
 public:
-	int32 m_value;
-	hkStringPtr m_name;
+  int32 m_value;
+  hkStringPtr m_name;
 };
 
-class hkxEnum : public hkReferencedObject
-{
+class hkxEnum : public hkReferencedObject {
 public:
-	virtual ~hkxEnum();
-	hkArray<hkxEnumItem> m_items;
+  virtual ~hkxEnum();
+  hkArray<hkxEnumItem> m_items;
 };
 
-class hkxEnvironmentVariable
-{
+class hkxEnvironmentVariable {
 public:
-	hkStringPtr m_name;
-	hkStringPtr m_value;
+  hkStringPtr m_name;
+  hkStringPtr m_value;
 };
 
-class hkxEnvironment : public hkReferencedObject
-{
+class hkxEnvironment : public hkReferencedObject {
 public:
-	virtual ~hkxEnvironment();
-	hkArray<hkxEnvironmentVariable> m_variables;
+  virtual ~hkxEnvironment();
+  hkArray<hkxEnvironmentVariable> m_variables;
 };
 
-class hkxIndexBuffer : public hkReferencedObject
-{
+class hkxIndexBuffer : public hkReferencedObject {
 public:
-	virtual ~hkxIndexBuffer();
-	int8 m_indexType;
-	hkArray<uint16> m_indices16;
-	hkArray<uint32> m_indices32;
-	uint32 m_vertexBaseOffset;
-	uint32 m_length;
+  virtual ~hkxIndexBuffer();
+  int8 m_indexType;
+  hkArray<uint16> m_indices16;
+  hkArray<uint32> m_indices32;
+  uint32 m_vertexBaseOffset;
+  uint32 m_length;
 };
 
-class hkxLight : public hkReferencedObject
-{
+class hkxLight : public hkReferencedObject {
 public:
-	virtual ~hkxLight();
-	int8 m_type;
-	hkVector4 m_position;
-	hkVector4 m_direction;
-	uint32 m_color;
-	float m_angle;
+  virtual ~hkxLight();
+  int8 m_type;
+  hkVector4 m_position;
+  hkVector4 m_direction;
+  uint32 m_color;
+  float m_angle;
 };
 
-class hkxMaterialTextureStage
-{
+class hkxMaterialTextureStage {
 public:
-	hkReferencedObject *m_texture;
-	int32 m_usageHint;
-	int32 m_tcoordChannel;
+  hkReferencedObject *m_texture;
+  int32 m_usageHint;
+  int32 m_tcoordChannel;
 };
 
-class hkxMaterialProperty
-{
+class hkxMaterialProperty {
 public:
-	uint32 m_key;
-	uint32 m_value;
+  uint32 m_key;
+  uint32 m_value;
 };
 
-class hkxMaterial : public hkxAttributeHolder
-{
+class hkxMaterial : public hkxAttributeHolder {
 public:
-	virtual ~hkxMaterial();
-	hkStringPtr m_name;
-	hkArray<hkxMaterialTextureStage> m_stages;
-	hkVector4 m_diffuseColor;
-	hkVector4 m_ambientColor;
-	hkVector4 m_specularColor;
-	hkVector4 m_emissiveColor;
-	hkArray<hkxMaterial *> m_subMaterials;
-	hkReferencedObject *m_extraData;
-	hkArray<hkxMaterialProperty> m_properties;
+  virtual ~hkxMaterial();
+  hkStringPtr m_name;
+  hkArray<hkxMaterialTextureStage> m_stages;
+  hkVector4 m_diffuseColor;
+  hkVector4 m_ambientColor;
+  hkVector4 m_specularColor;
+  hkVector4 m_emissiveColor;
+  hkArray<hkxMaterial *> m_subMaterials;
+  hkReferencedObject *m_extraData;
+  hkArray<hkxMaterialProperty> m_properties;
 };
 
-class hkxMaterialEffect : public hkReferencedObject
-{
+class hkxMaterialEffect : public hkReferencedObject {
 public:
-	virtual ~hkxMaterialEffect();
-	hkStringPtr m_name;
-	uint8 m_type;
-	hkArray<uint8> m_data;
+  virtual ~hkxMaterialEffect();
+  hkStringPtr m_name;
+  uint8 m_type;
+  hkArray<uint8> m_data;
 };
 
-class hkxMaterialShader : public hkReferencedObject
-{
+class hkxMaterialShader : public hkReferencedObject {
 public:
-	virtual ~hkxMaterialShader();
-	hkStringPtr m_name;
-	uint8 m_type;
-	hkStringPtr m_vertexEntryName;
-	hkStringPtr m_geomEntryName;
-	hkStringPtr m_pixelEntryName;
-	hkArray<uint8> m_data;
+  virtual ~hkxMaterialShader();
+  hkStringPtr m_name;
+  uint8 m_type;
+  hkStringPtr m_vertexEntryName;
+  hkStringPtr m_geomEntryName;
+  hkStringPtr m_pixelEntryName;
+  hkArray<uint8> m_data;
 };
 
-class hkxMaterialShaderSet : public hkReferencedObject
-{
+class hkxMaterialShaderSet : public hkReferencedObject {
 public:
-	virtual ~hkxMaterialShaderSet();
-	hkArray<hkxMaterialShader *> m_shaders;
+  virtual ~hkxMaterialShaderSet();
+  hkArray<hkxMaterialShader *> m_shaders;
 };
 
-class hkxMeshUserChannelInfo : public hkxAttributeHolder
-{
+class hkxMeshUserChannelInfo : public hkxAttributeHolder {
 public:
-	virtual ~hkxMeshUserChannelInfo();
-	hkStringPtr m_name;
-	hkStringPtr m_className;
+  virtual ~hkxMeshUserChannelInfo();
+  hkStringPtr m_name;
+  hkStringPtr m_className;
 };
 
-class hkxVertexDescriptionElementDecl
-{
+class hkxVertexDescriptionElementDecl {
 public:
-	uint32 m_byteOffset;
-	uint16 m_type;
-	uint16 m_usage;
-	uint32 m_byteStride;
-	uint8 m_numElements;
+  uint32 m_byteOffset;
+  uint16 m_type;
+  uint16 m_usage;
+  uint32 m_byteStride;
+  uint8 m_numElements;
 };
 
-class hkxVertexDescription
-{
+class hkxVertexDescription {
 public:
-	hkArray<hkxVertexDescriptionElementDecl> m_decls;
+  hkArray<hkxVertexDescriptionElementDecl> m_decls;
 };
 
-class hkxVertexBufferVertexData
-{
+class hkxVertexBufferVertexData {
 public:
-	hkArray<hkVector4> m_vectorData;
-	hkArray<float> m_floatData;
-	hkArray<uint32> m_uint32Data;
-	hkArray<uint16> m_uint16Data;
-	hkArray<uint8> m_uint8Data;
-	uint32 m_numVerts;
-	uint32 m_vectorStride;
-	uint32 m_floatStride;
-	uint32 m_uint32Stride;
-	uint32 m_uint16Stride;
-	uint32 m_uint8Stride;
+  hkArray<hkVector4> m_vectorData;
+  hkArray<float> m_floatData;
+  hkArray<uint32> m_uint32Data;
+  hkArray<uint16> m_uint16Data;
+  hkArray<uint8> m_uint8Data;
+  uint32 m_numVerts;
+  uint32 m_vectorStride;
+  uint32 m_floatStride;
+  uint32 m_uint32Stride;
+  uint32 m_uint16Stride;
+  uint32 m_uint8Stride;
 };
 
-class hkxVertexBuffer : public hkReferencedObject
-{
+class hkxVertexBuffer : public hkReferencedObject {
 public:
-	virtual ~hkxVertexBuffer();
-	hkxVertexBufferVertexData m_data;
-	hkxVertexDescription m_desc;
+  virtual ~hkxVertexBuffer();
+  hkxVertexBufferVertexData m_data;
+  hkxVertexDescription m_desc;
 };
 
-class hkxMeshSection : public hkReferencedObject
-{
+class hkxMeshSection : public hkReferencedObject {
 public:
-	virtual ~hkxMeshSection();
-	hkxVertexBuffer *m_vertexBuffer;
-	hkArray<hkxIndexBuffer *> m_indexBuffers;
-	hkxMaterial *m_material;
-	hkArray<hkReferencedObject *> m_userChannels;
+  virtual ~hkxMeshSection();
+  hkxVertexBuffer *m_vertexBuffer;
+  hkArray<hkxIndexBuffer *> m_indexBuffers;
+  hkxMaterial *m_material;
+  hkArray<hkReferencedObject *> m_userChannels;
 };
 
-class hkxMesh : public hkReferencedObject
-{
+class hkxMesh : public hkReferencedObject {
 public:
-	virtual ~hkxMesh();
-	hkArray<hkxMeshSection *> m_sections;
-	hkArray<hkxMeshUserChannelInfo *> m_userChannelInfos;
+  virtual ~hkxMesh();
+  hkArray<hkxMeshSection *> m_sections;
+  hkArray<hkxMeshUserChannelInfo *> m_userChannelInfos;
 };
 
-class hkxNodeAnnotationData
-{
+class hkxNodeAnnotationData {
 public:
-	float m_time;
-	hkStringPtr m_description;
+  float m_time;
+  hkStringPtr m_description;
 };
 
-class hkxNode : public hkxAttributeHolder
-{
+class hkxNode : public hkxAttributeHolder {
 public:
-	virtual ~hkxNode();
-	hkStringPtr m_name;
-	hkReferencedObject *m_object;
-	hkArray<hkMatrix4> m_keyFrames;
-	hkArray<hkxNode *> m_children;
-	hkArray<hkxNodeAnnotationData> m_annotations;
-	hkStringPtr m_userProperties;
-	bool m_selected;
+  virtual ~hkxNode();
+  hkStringPtr m_name;
+  hkReferencedObject *m_object;
+  hkArray<hkMatrix4> m_keyFrames;
+  hkArray<hkxNode *> m_children;
+  hkArray<hkxNodeAnnotationData> m_annotations;
+  hkStringPtr m_userProperties;
+  bool m_selected;
 };
 
-class hkxNodeSelectionSet : public hkxAttributeHolder
-{
+class hkxNodeSelectionSet : public hkxAttributeHolder {
 public:
-	virtual ~hkxNodeSelectionSet();
-	hkArray<hkxNode *> m_selectedNodes;
-	hkStringPtr m_name;
+  virtual ~hkxNodeSelectionSet();
+  hkArray<hkxNode *> m_selectedNodes;
+  hkStringPtr m_name;
 };
 
-class hkxSkinBinding : public hkReferencedObject
-{
+class hkxSkinBinding : public hkReferencedObject {
 public:
-	virtual ~hkxSkinBinding();
-	hkxMesh *m_mesh;
-	hkArray<hkStringPtr> m_nodeNames;
-	hkArray<hkMatrix4> m_bindPose;
-	hkMatrix4 m_initSkinTransform;
+  virtual ~hkxSkinBinding();
+  hkxMesh *m_mesh;
+  hkArray<hkStringPtr> m_nodeNames;
+  hkArray<hkMatrix4> m_bindPose;
+  hkMatrix4 m_initSkinTransform;
 };
 
-class hkxTextureFile : public hkReferencedObject
-{
+class hkxTextureFile : public hkReferencedObject {
 public:
-	virtual ~hkxTextureFile();
-	hkStringPtr m_filename;
-	hkStringPtr m_name;
-	hkStringPtr m_originalFilename;
+  virtual ~hkxTextureFile();
+  hkStringPtr m_filename;
+  hkStringPtr m_name;
+  hkStringPtr m_originalFilename;
 };
 
-class hkxTextureInplace : public hkReferencedObject
-{
+class hkxTextureInplace : public hkReferencedObject {
 public:
-	virtual ~hkxTextureInplace();
-	char m_fileType;
-	hkArray<uint8> m_data;
-	hkStringPtr m_name;
-	hkStringPtr m_originalFilename;
+  virtual ~hkxTextureInplace();
+  char m_fileType;
+  hkArray<uint8> m_data;
+  hkStringPtr m_name;
+  hkStringPtr m_originalFilename;
 };
 
-class hkxScene : public hkReferencedObject
-{
+class hkxScene : public hkReferencedObject {
 public:
-	virtual ~hkxScene();
-	hkStringPtr m_modeller;
-	hkStringPtr m_asset;
-	float m_sceneLength;
-	hkxNode *m_rootNode;
-	hkArray<hkxNodeSelectionSet *> m_selectionSets;
-	hkArray<hkxCamera *> m_cameras;
-	hkArray<hkxLight *> m_lights;
-	hkArray<hkxMesh *> m_meshes;
-	hkArray<hkxMaterial *> m_materials;
-	hkArray<hkxTextureInplace *> m_inplaceTextures;
-	hkArray<hkxTextureFile *> m_externalTextures;
-	hkArray<hkxSkinBinding *> m_skinBindings;
-	hkMatrix3 m_appliedTransform;
+  virtual ~hkxScene();
+  hkStringPtr m_modeller;
+  hkStringPtr m_asset;
+  float m_sceneLength;
+  hkxNode *m_rootNode;
+  hkArray<hkxNodeSelectionSet *> m_selectionSets;
+  hkArray<hkxCamera *> m_cameras;
+  hkArray<hkxLight *> m_lights;
+  hkArray<hkxMesh *> m_meshes;
+  hkArray<hkxMaterial *> m_materials;
+  hkArray<hkxTextureInplace *> m_inplaceTextures;
+  hkArray<hkxTextureFile *> m_externalTextures;
+  hkArray<hkxSkinBinding *> m_skinBindings;
+  hkMatrix3 m_appliedTransform;
 };
 
-class hkxSparselyAnimatedBool : public hkReferencedObject
-{
+class hkxSparselyAnimatedBool : public hkReferencedObject {
 public:
-	virtual ~hkxSparselyAnimatedBool();
-	hkArray<bool> m_bools;
-	hkArray<float> m_times;
+  virtual ~hkxSparselyAnimatedBool();
+  hkArray<bool> m_bools;
+  hkArray<float> m_times;
 };
 
-class hkxSparselyAnimatedInt : public hkReferencedObject
-{
+class hkxSparselyAnimatedInt : public hkReferencedObject {
 public:
-	virtual ~hkxSparselyAnimatedInt();
-	hkArray<int32> m_ints;
-	hkArray<float> m_times;
+  virtual ~hkxSparselyAnimatedInt();
+  hkArray<int32> m_ints;
+  hkArray<float> m_times;
 };
 
-class hkxSparselyAnimatedEnum : public hkxSparselyAnimatedInt
-{
+class hkxSparselyAnimatedEnum : public hkxSparselyAnimatedInt {
 public:
-	virtual ~hkxSparselyAnimatedEnum();
-	hkxEnum *m_enum;
+  virtual ~hkxSparselyAnimatedEnum();
+  hkxEnum *m_enum;
 };
 
-class hkxSparselyAnimatedString : public hkReferencedObject
-{
+class hkxSparselyAnimatedString : public hkReferencedObject {
 public:
-	virtual ~hkxSparselyAnimatedString();
-	hkArray<hkStringPtr> m_strings;
-	hkArray<float> m_times;
+  virtual ~hkxSparselyAnimatedString();
+  hkArray<hkStringPtr> m_strings;
+  hkArray<float> m_times;
 };
 
-class hkxTriangleSelectionChannel : public hkReferencedObject
-{
+class hkxTriangleSelectionChannel : public hkReferencedObject {
 public:
-	virtual ~hkxTriangleSelectionChannel();
-	hkArray<int32> m_selectedTriangles;
+  virtual ~hkxTriangleSelectionChannel();
+  hkArray<int32> m_selectedTriangles;
 };
 
-class hkxVertexFloatDataChannel : public hkReferencedObject
-{
+class hkxVertexFloatDataChannel : public hkReferencedObject {
 public:
-	virtual ~hkxVertexFloatDataChannel();
-	hkArray<float> m_perVertexFloats;
-	uint8 m_dimensions;
+  virtual ~hkxVertexFloatDataChannel();
+  hkArray<float> m_perVertexFloats;
+  uint8 m_dimensions;
 };
 
-class hkxVertexIntDataChannel : public hkReferencedObject
-{
+class hkxVertexIntDataChannel : public hkReferencedObject {
 public:
-	virtual ~hkxVertexIntDataChannel();
-	hkArray<int32> m_perVertexInts;
+  virtual ~hkxVertexIntDataChannel();
+  hkArray<int32> m_perVertexInts;
 };
 
-class hkxVertexSelectionChannel : public hkReferencedObject
-{
+class hkxVertexSelectionChannel : public hkReferencedObject {
 public:
-	virtual ~hkxVertexSelectionChannel();
-	hkArray<int32> m_selectedVertices;
+  virtual ~hkxVertexSelectionChannel();
+  hkArray<int32> m_selectedVertices;
 };
 
-class hkxVertexVectorDataChannel : public hkReferencedObject
-{
+class hkxVertexVectorDataChannel : public hkReferencedObject {
 public:
-	virtual ~hkxVertexVectorDataChannel();
-	hkArray<hkVector4> m_perVertexVectors;
+  virtual ~hkxVertexVectorDataChannel();
+  hkArray<hkVector4> m_perVertexVectors;
 };
 
-class hkMeshBoneIndexMapping
-{
+class hkMeshBoneIndexMapping {
 public:
-	hkArray<int16> m_mapping;
+  hkArray<int16> m_mapping;
 };
 
-class hkIndexedTransformSet : public hkReferencedObject
-{
+class hkIndexedTransformSet : public hkReferencedObject {
 public:
-	virtual ~hkIndexedTransformSet();
-	hkArray<hkMatrix4> m_matrices;
-	hkArray<hkMatrix4> m_inverseMatrices;
-	hkArray<int16> m_matricesOrder;
-	hkArray<hkStringPtr> m_matricesNames;
-	hkArray<hkMeshBoneIndexMapping> m_indexMappings;
-	bool m_allMatricesAreAffine;
+  virtual ~hkIndexedTransformSet();
+  hkArray<hkMatrix4> m_matrices;
+  hkArray<hkMatrix4> m_inverseMatrices;
+  hkArray<int16> m_matricesOrder;
+  hkArray<hkStringPtr> m_matricesNames;
+  hkArray<hkMeshBoneIndexMapping> m_indexMappings;
+  bool m_allMatricesAreAffine;
 };
 
-class hkMeshVertexBuffer : public hkReferencedObject
-{
+class hkMeshVertexBuffer : public hkReferencedObject {
 public:
 };
 
-class hkMeshShape : public hkReferencedObject
-{
+class hkMeshShape : public hkReferencedObject {
 public:
 };
 
-class hkMeshBody : public hkReferencedObject
-{
+class hkMeshBody : public hkReferencedObject {
 public:
 };
 
-class hkMemoryMeshBody : public hkMeshBody
-{
+class hkMemoryMeshBody : public hkMeshBody {
 public:
-	virtual ~hkMemoryMeshBody();
-	hkMatrix4 m_transform;
-	hkIndexedTransformSet *m_transformSet;
-	hkMeshShape *m_shape;
-	hkArray<hkMeshVertexBuffer *> m_vertexBuffers;
-	hkStringPtr m_name;
+  virtual ~hkMemoryMeshBody();
+  hkMatrix4 m_transform;
+  hkIndexedTransformSet *m_transformSet;
+  hkMeshShape *m_shape;
+  hkArray<hkMeshVertexBuffer *> m_vertexBuffers;
+  hkStringPtr m_name;
 };
 
-class hkMeshTexture : public hkReferencedObject
-{
+class hkMeshTexture : public hkReferencedObject {
 public:
 };
 
-class hkMeshMaterial : public hkReferencedObject
-{
+class hkMeshMaterial : public hkReferencedObject {
 public:
 };
 
-class hkMemoryMeshMaterial : public hkMeshMaterial
-{
+class hkMemoryMeshMaterial : public hkMeshMaterial {
 public:
-	virtual ~hkMemoryMeshMaterial();
-	hkStringPtr m_materialName;
-	hkArray<hkMeshTexture *> m_textures;
+  virtual ~hkMemoryMeshMaterial();
+  hkStringPtr m_materialName;
+  hkArray<hkMeshTexture *> m_textures;
 };
 
-class hkMeshSectionCinfo
-{
+class hkMeshSectionCinfo {
 public:
-	hkMeshVertexBuffer *m_vertexBuffer;
-	hkMeshMaterial *m_material;
-	uint8 m_primitiveType;
-	int32 m_numPrimitives;
-	uint8 m_indexType;
-	void *m_indices;
-	int32 m_vertexStartIndex;
-	int32 m_transformIndex;
+  hkMeshVertexBuffer *m_vertexBuffer;
+  hkMeshMaterial *m_material;
+  uint8 m_primitiveType;
+  int32 m_numPrimitives;
+  uint8 m_indexType;
+  void *m_indices;
+  int32 m_vertexStartIndex;
+  int32 m_transformIndex;
 };
 
-class hkMemoryMeshShape : public hkMeshShape
-{
+class hkMemoryMeshShape : public hkMeshShape {
 public:
-	virtual ~hkMemoryMeshShape();
-	hkArray<hkMeshSectionCinfo> m_sections;
-	hkArray<uint16> m_indices16;
-	hkArray<uint32> m_indices32;
-	hkStringPtr m_name;
+  virtual ~hkMemoryMeshShape();
+  hkArray<hkMeshSectionCinfo> m_sections;
+  hkArray<uint16> m_indices16;
+  hkArray<uint32> m_indices32;
+  hkStringPtr m_name;
 };
 
-class hkMemoryMeshTexture : public hkMeshTexture
-{
+class hkMemoryMeshTexture : public hkMeshTexture {
 public:
-	virtual ~hkMemoryMeshTexture();
-	hkStringPtr m_filename;
-	hkArray<uint8> m_data;
-	int8 m_format;
-	bool m_hasMipMaps;
-	int8 m_filterMode;
-	int8 m_usageHint;
-	int32 m_textureCoordChannel;
+  virtual ~hkMemoryMeshTexture();
+  hkStringPtr m_filename;
+  hkArray<uint8> m_data;
+  int8 m_format;
+  bool m_hasMipMaps;
+  int8 m_filterMode;
+  int8 m_usageHint;
+  int32 m_textureCoordChannel;
 };
 
-class hkVertexFormatElement
-{
+class hkVertexFormatElement {
 public:
-	uint8 m_dataType;
-	uint8 m_numValues;
-	uint8 m_usage;
-	uint8 m_subUsage;
-	hkFlags m_flags;
-	uint8 m_pad;
+  uint8 m_dataType;
+  uint8 m_numValues;
+  uint8 m_usage;
+  uint8 m_subUsage;
+  hkFlags m_flags;
+  uint8 m_pad;
 };
 
-class hkVertexFormat
-{
+class hkVertexFormat {
 public:
-	hkVertexFormatElement m_elements;
-	int32 m_numElements;
+  hkVertexFormatElement m_elements;
+  int32 m_numElements;
 };
 
-class hkMemoryMeshVertexBuffer : public hkMeshVertexBuffer
-{
+class hkMemoryMeshVertexBuffer : public hkMeshVertexBuffer {
 public:
-	virtual ~hkMemoryMeshVertexBuffer();
-	hkVertexFormat m_format;
-	int32 m_elementOffsets;
-	hkArray<uint8> m_memory;
-	int32 m_vertexStride;
-	bool m_locked;
-	int32 m_numVertices;
-	bool m_isBigEndian;
-	bool m_isSharable;
+  virtual ~hkMemoryMeshVertexBuffer();
+  hkVertexFormat m_format;
+  int32 m_elementOffsets;
+  hkArray<uint8> m_memory;
+  int32 m_vertexStride;
+  bool m_locked;
+  int32 m_numVertices;
+  bool m_isBigEndian;
+  bool m_isSharable;
 };
 
-class hkMultipleVertexBufferElementInfo
-{
+class hkMultipleVertexBufferElementInfo {
 public:
-	uint8 m_vertexBufferIndex;
-	uint8 m_elementIndex;
+  uint8 m_vertexBufferIndex;
+  uint8 m_elementIndex;
 };
 
-class hkMultipleVertexBufferVertexBufferInfo
-{
+class hkMultipleVertexBufferVertexBufferInfo {
 public:
-	hkMeshVertexBuffer *m_vertexBuffer;
-	void *m_lockedVertices;
-	bool m_isLocked;
+  hkMeshVertexBuffer *m_vertexBuffer;
+  void *m_lockedVertices;
+  bool m_isLocked;
 };
 
-class hkMultipleVertexBufferLockedElement
-{
+class hkMultipleVertexBufferLockedElement {
 public:
-	uint8 m_vertexBufferIndex;
-	uint8 m_elementIndex;
-	uint8 m_lockedBufferIndex;
-	uint8 m_vertexFormatIndex;
-	uint8 m_lockFlags;
-	uint8 m_outputBufferIndex;
-	int8 m_emulatedIndex;
+  uint8 m_vertexBufferIndex;
+  uint8 m_elementIndex;
+  uint8 m_lockedBufferIndex;
+  uint8 m_vertexFormatIndex;
+  uint8 m_lockFlags;
+  uint8 m_outputBufferIndex;
+  int8 m_emulatedIndex;
 };
 
-class hkMultipleVertexBuffer : public hkMeshVertexBuffer
-{
+class hkMultipleVertexBuffer : public hkMeshVertexBuffer {
 public:
-	virtual ~hkMultipleVertexBuffer();
-	hkVertexFormat m_vertexFormat;
-	hkArray<hkMultipleVertexBufferLockedElement> m_lockedElements;
-	hkMemoryMeshVertexBuffer *m_lockedBuffer;
-	hkArray<hkMultipleVertexBufferElementInfo> m_elementInfos;
-	hkArray<hkMultipleVertexBufferVertexBufferInfo> m_vertexBufferInfos;
-	int32 m_numVertices;
-	bool m_isLocked;
-	uint32 m_updateCount;
-	bool m_writeLock;
-	bool m_isSharable;
-	bool m_constructionComplete;
+  virtual ~hkMultipleVertexBuffer();
+  hkVertexFormat m_vertexFormat;
+  hkArray<hkMultipleVertexBufferLockedElement> m_lockedElements;
+  hkMemoryMeshVertexBuffer *m_lockedBuffer;
+  hkArray<hkMultipleVertexBufferElementInfo> m_elementInfos;
+  hkArray<hkMultipleVertexBufferVertexBufferInfo> m_vertexBufferInfos;
+  int32 m_numVertices;
+  bool m_isLocked;
+  uint32 m_updateCount;
+  bool m_writeLock;
+  bool m_isSharable;
+  bool m_constructionComplete;
 };
 
-class hkpShape : public hkReferencedObject
-{
+class hkpShape : public hkReferencedObject {
 public:
-	uint64 m_userData;
-	uint32 m_type;
+  uint64 m_userData;
+  uint32 m_type;
 };
 
-class hkpSphereRepShape : public hkpShape
-{
+class hkpSphereRepShape : public hkpShape {
 public:
 };
 
-class hkpConvexShape : public hkpSphereRepShape
-{
+class hkpConvexShape : public hkpSphereRepShape {
 public:
-	float m_radius;
+  float m_radius;
 };
 
-class hkpBoxShape : public hkpConvexShape
-{
+class hkpBoxShape : public hkpConvexShape {
 public:
-	virtual ~hkpBoxShape();
-	hkVector4 m_halfExtents;
+  virtual ~hkpBoxShape();
+  hkVector4 m_halfExtents;
 };
 
-class hkpShapeContainer
-{
+class hkpShapeContainer {
 public:
 };
 
-class hkpSingleShapeContainer : public hkpShapeContainer
-{
+class hkpSingleShapeContainer : public hkpShapeContainer {
 public:
-	virtual ~hkpSingleShapeContainer();
-	hkpShape *m_childShape;
+  virtual ~hkpSingleShapeContainer();
+  hkpShape *m_childShape;
 };
 
-class hkpBvShape : public hkpShape
-{
+class hkpBvShape : public hkpShape {
 public:
-	virtual ~hkpBvShape();
-	hkpShape *m_boundingVolumeShape;
-	hkpSingleShapeContainer m_childShape;
+  virtual ~hkpBvShape();
+  hkpShape *m_boundingVolumeShape;
+  hkpSingleShapeContainer m_childShape;
 };
 
-class hkpCapsuleShape : public hkpConvexShape
-{
+class hkpCapsuleShape : public hkpConvexShape {
 public:
-	virtual ~hkpCapsuleShape();
-	hkVector4 m_vertexA;
-	hkVector4 m_vertexB;
+  virtual ~hkpCapsuleShape();
+  hkVector4 m_vertexA;
+  hkVector4 m_vertexB;
 };
 
-class hkpCollisionFilter : public hkReferencedObject
-{
+class hkpCollisionFilter : public hkReferencedObject {
 public:
-	uint32 m_prepad;
-	uint32 m_type;
-	uint32 m_postpad;
+  uint32 m_prepad;
+  uint32 m_type;
+  uint32 m_postpad;
 };
 
-class hkpCollisionFilterList : public hkpCollisionFilter
-{
+class hkpCollisionFilterList : public hkpCollisionFilter {
 public:
-	virtual ~hkpCollisionFilterList();
-	hkArray<hkpCollisionFilter *> m_collisionFilters;
+  virtual ~hkpCollisionFilterList();
+  hkArray<hkpCollisionFilter *> m_collisionFilters;
 };
 
-class hkpConvexListShape : public hkpConvexShape
-{
+class hkpConvexListShape : public hkpConvexShape {
 public:
-	virtual ~hkpConvexListShape();
-	float m_minDistanceToUseConvexHullForGetClosestPoints;
-	hkVector4 m_aabbHalfExtents;
-	hkVector4 m_aabbCenter;
-	bool m_useCachedAabb;
-	hkArray<hkpConvexShape *> m_childShapes;
+  virtual ~hkpConvexListShape();
+  float m_minDistanceToUseConvexHullForGetClosestPoints;
+  hkVector4 m_aabbHalfExtents;
+  hkVector4 m_aabbCenter;
+  bool m_useCachedAabb;
+  hkArray<hkpConvexShape *> m_childShapes;
 };
 
-class hkpConvexTransformShapeBase : public hkpConvexShape
-{
+class hkpConvexTransformShapeBase : public hkpConvexShape {
 public:
-	hkpSingleShapeContainer m_childShape;
-	int32 m_childShapeSize;
+  hkpSingleShapeContainer m_childShape;
+  int32 m_childShapeSize;
 };
 
-class hkpConvexTransformShape : public hkpConvexTransformShapeBase
-{
+class hkpConvexTransformShape : public hkpConvexTransformShapeBase {
 public:
-	virtual ~hkpConvexTransformShape();
-	hkTransform m_transform;
+  virtual ~hkpConvexTransformShape();
+  hkTransform m_transform;
 };
 
-class hkpConvexTranslateShape : public hkpConvexTransformShapeBase
-{
+class hkpConvexTranslateShape : public hkpConvexTransformShapeBase {
 public:
-	virtual ~hkpConvexTranslateShape();
-	hkVector4 m_translation;
+  virtual ~hkpConvexTranslateShape();
+  hkVector4 m_translation;
 };
 
-class hkpConvexVerticesConnectivity : public hkReferencedObject
-{
+class hkpConvexVerticesConnectivity : public hkReferencedObject {
 public:
-	virtual ~hkpConvexVerticesConnectivity();
-	hkArray<uint16> m_vertexIndices;
-	hkArray<uint8> m_numVerticesPerFace;
+  virtual ~hkpConvexVerticesConnectivity();
+  hkArray<uint16> m_vertexIndices;
+  hkArray<uint8> m_numVerticesPerFace;
 };
 
-class hkpCylinderShape : public hkpConvexShape
-{
+class hkpCylinderShape : public hkpConvexShape {
 public:
-	virtual ~hkpCylinderShape();
-	float m_cylRadius;
-	float m_cylBaseRadiusFactorForHeightFieldCollisions;
-	hkVector4 m_vertexA;
-	hkVector4 m_vertexB;
-	hkVector4 m_perpendicular1;
-	hkVector4 m_perpendicular2;
+  virtual ~hkpCylinderShape();
+  float m_cylRadius;
+  float m_cylBaseRadiusFactorForHeightFieldCollisions;
+  hkVector4 m_vertexA;
+  hkVector4 m_vertexB;
+  hkVector4 m_perpendicular1;
+  hkVector4 m_perpendicular2;
 };
 
-class hkpConvexListFilter : public hkReferencedObject
-{
+class hkpConvexListFilter : public hkReferencedObject {
 public:
 };
 
-class hkpDefaultConvexListFilter : public hkpConvexListFilter
-{
+class hkpDefaultConvexListFilter : public hkpConvexListFilter {
 public:
-	virtual ~hkpDefaultConvexListFilter();
+  virtual ~hkpDefaultConvexListFilter();
 };
 
-class hkpGroupFilter : public hkpCollisionFilter
-{
+class hkpGroupFilter : public hkpCollisionFilter {
 public:
-	virtual ~hkpGroupFilter();
-	int32 m_nextFreeSystemGroup;
-	uint32 m_collisionLookupTable;
-	hkVector4 m_pad256;
+  virtual ~hkpGroupFilter();
+  int32 m_nextFreeSystemGroup;
+  uint32 m_collisionLookupTable;
+  hkVector4 m_pad256;
 };
 
-class hkpListShapeChildInfo
-{
+class hkpListShapeChildInfo {
 public:
-	hkpShape *m_shape;
-	uint32 m_collisionFilterInfo;
-	int32 m_shapeSize;
-	int32 m_numChildShapes;
+  hkpShape *m_shape;
+  uint32 m_collisionFilterInfo;
+  int32 m_shapeSize;
+  int32 m_numChildShapes;
 };
 
-class hkpShapeCollection : public hkpShape
-{
+class hkpShapeCollection : public hkpShape {
 public:
-	bool m_disableWelding;
-	uint8 m_collectionType;
+  bool m_disableWelding;
+  uint8 m_collectionType;
 };
 
-class hkpListShape : public hkpShapeCollection
-{
+class hkpListShape : public hkpShapeCollection {
 public:
-	virtual ~hkpListShape();
-	hkArray<hkpListShapeChildInfo> m_childInfo;
-	uint16 m_flags;
-	uint16 m_numDisabledChildren;
-	hkVector4 m_aabbHalfExtents;
-	hkVector4 m_aabbCenter;
-	uint32 m_enabledChildren;
+  virtual ~hkpListShape();
+  hkArray<hkpListShapeChildInfo> m_childInfo;
+  uint16 m_flags;
+  uint16 m_numDisabledChildren;
+  hkVector4 m_aabbHalfExtents;
+  hkVector4 m_aabbCenter;
+  uint32 m_enabledChildren;
 };
 
-class hkpMoppCodeCodeInfo
-{
+class hkpMoppCodeCodeInfo {
 public:
-	hkVector4 m_offset;
+  hkVector4 m_offset;
 };
 
-class hkpMoppCode : public hkReferencedObject
-{
+class hkpMoppCode : public hkReferencedObject {
 public:
-	virtual ~hkpMoppCode();
-	hkpMoppCodeCodeInfo m_info;
-	hkArray<uint8> m_data;
-	int8 m_buildType;
+  virtual ~hkpMoppCode();
+  hkpMoppCodeCodeInfo m_info;
+  hkArray<uint8> m_data;
+  int8 m_buildType;
 };
 
-class hkpBvTreeShape : public hkpShape
-{
+class hkpBvTreeShape : public hkpShape {
 public:
-	uint8 m_bvTreeType;
+  uint8 m_bvTreeType;
 };
 
-class hkMoppBvTreeShapeBase : public hkpBvTreeShape
-{
+class hkMoppBvTreeShapeBase : public hkpBvTreeShape {
 public:
-	hkpMoppCode *m_code;
-	void *m_moppData;
-	uint32 m_moppDataSize;
-	hkVector4 m_codeInfoCopy;
+  hkpMoppCode *m_code;
+  void *m_moppData;
+  uint32 m_moppDataSize;
+  hkVector4 m_codeInfoCopy;
 };
 
-class hkpMoppBvTreeShape : public hkMoppBvTreeShapeBase
-{
+class hkpMoppBvTreeShape : public hkMoppBvTreeShapeBase {
 public:
-	virtual ~hkpMoppBvTreeShape();
-	hkpSingleShapeContainer m_child;
-	int32 m_childSize;
+  virtual ~hkpMoppBvTreeShape();
+  hkpSingleShapeContainer m_child;
+  int32 m_childSize;
 };
 
-class hkpMultiRayShapeRay
-{
+class hkpMultiRayShapeRay {
 public:
-	hkVector4 m_start;
-	hkVector4 m_end;
+  hkVector4 m_start;
+  hkVector4 m_end;
 };
 
-class hkpMultiRayShape : public hkpShape
-{
+class hkpMultiRayShape : public hkpShape {
 public:
-	virtual ~hkpMultiRayShape();
-	hkArray<hkpMultiRayShapeRay> m_rays;
-	float m_rayPenetrationDistance;
+  virtual ~hkpMultiRayShape();
+  hkArray<hkpMultiRayShapeRay> m_rays;
+  float m_rayPenetrationDistance;
 };
 
-class hkpMultiSphereShape : public hkpSphereRepShape
-{
+class hkpMultiSphereShape : public hkpSphereRepShape {
 public:
-	virtual ~hkpMultiSphereShape();
-	int32 m_numSpheres;
-	hkVector4 m_spheres;
+  virtual ~hkpMultiSphereShape();
+  int32 m_numSpheres;
+  hkVector4 m_spheres;
 };
 
-class hkpNullCollisionFilter : public hkpCollisionFilter
-{
+class hkpNullCollisionFilter : public hkpCollisionFilter {
 public:
-	virtual ~hkpNullCollisionFilter();
+  virtual ~hkpNullCollisionFilter();
 };
 
-class hkpRemoveTerminalsMoppModifier : public hkReferencedObject
-{
+class hkpRemoveTerminalsMoppModifier : public hkReferencedObject {
 public:
-	virtual ~hkpRemoveTerminalsMoppModifier();
-	hkArray<uint32> m_removeInfo;
-	void *m_tempShapesToRemove;
+  virtual ~hkpRemoveTerminalsMoppModifier();
+  hkArray<uint32> m_removeInfo;
+  void *m_tempShapesToRemove;
 };
 
-class hkpShapeInfo : public hkReferencedObject
-{
+class hkpShapeInfo : public hkReferencedObject {
 public:
-	virtual ~hkpShapeInfo();
-	hkpShape *m_shape;
-	bool m_isHierarchicalCompound;
-	bool m_hkdShapesCollected;
-	hkArray<hkStringPtr> m_childShapeNames;
-	hkArray<hkTransform> m_childTransforms;
-	hkTransform m_transform;
+  virtual ~hkpShapeInfo();
+  hkpShape *m_shape;
+  bool m_isHierarchicalCompound;
+  bool m_hkdShapesCollected;
+  hkArray<hkStringPtr> m_childShapeNames;
+  hkArray<hkTransform> m_childTransforms;
+  hkTransform m_transform;
 };
 
-class hkpSphereShape : public hkpConvexShape
-{
+class hkpSphereShape : public hkpConvexShape {
 public:
-	virtual ~hkpSphereShape();
-	uint32 m_pad16;
+  virtual ~hkpSphereShape();
+  uint32 m_pad16;
 };
 
-class hkpTransformShape : public hkpShape
-{
+class hkpTransformShape : public hkpShape {
 public:
-	virtual ~hkpTransformShape();
-	hkpSingleShapeContainer m_childShape;
-	int32 m_childShapeSize;
-	hkQuaternion m_rotation;
-	hkTransform m_transform;
+  virtual ~hkpTransformShape();
+  hkpSingleShapeContainer m_childShape;
+  int32 m_childShapeSize;
+  hkQuaternion m_rotation;
+  hkTransform m_transform;
 };
 
-class hkpTriangleShape : public hkpConvexShape
-{
+class hkpTriangleShape : public hkpConvexShape {
 public:
-	virtual ~hkpTriangleShape();
-	uint16 m_weldingInfo;
-	uint8 m_weldingType;
-	uint8 m_isExtruded;
-	hkVector4 m_vertexA;
-	hkVector4 m_vertexB;
-	hkVector4 m_vertexC;
-	hkVector4 m_extrusion;
+  virtual ~hkpTriangleShape();
+  uint16 m_weldingInfo;
+  uint8 m_weldingType;
+  uint8 m_isExtruded;
+  hkVector4 m_vertexA;
+  hkVector4 m_vertexB;
+  hkVector4 m_vertexC;
+  hkVector4 m_extrusion;
 };
 
-class hkAabb
-{
+class hkAabb {
 public:
-	hkVector4 m_min;
-	hkVector4 m_max;
+  hkVector4 m_min;
+  hkVector4 m_max;
 };
 
-class hkpCompressedMeshShapeChunk
-{
+class hkpCompressedMeshShapeChunk {
 public:
-	hkVector4 m_offset;
-	hkArray<uint16> m_vertices;
-	hkArray<uint16> m_indices;
-	hkArray<uint16> m_stripLengths;
-	hkArray<uint16> m_weldingInfo;
-	uint32 m_materialInfo;
-	uint16 m_reference;
-	uint16 m_transformIndex;
+  hkVector4 m_offset;
+  hkArray<uint16> m_vertices;
+  hkArray<uint16> m_indices;
+  hkArray<uint16> m_stripLengths;
+  hkArray<uint16> m_weldingInfo;
+  uint32 m_materialInfo;
+  uint16 m_reference;
+  uint16 m_transformIndex;
 };
 
-class hkpCompressedMeshShapeConvexPiece
-{
+class hkpCompressedMeshShapeConvexPiece {
 public:
-	hkVector4 m_offset;
-	hkArray<uint16> m_vertices;
-	hkArray<uint8> m_faceVertices;
-	hkArray<uint16> m_faceOffsets;
-	uint16 m_reference;
-	uint16 m_transformIndex;
+  hkVector4 m_offset;
+  hkArray<uint16> m_vertices;
+  hkArray<uint8> m_faceVertices;
+  hkArray<uint16> m_faceOffsets;
+  uint16 m_reference;
+  uint16 m_transformIndex;
 };
 
-class hkpMeshMaterial
-{
+class hkpMeshMaterial {
 public:
-	uint32 m_filterInfo;
+  uint32 m_filterInfo;
 };
 
-class hkpNamedMeshMaterial : public hkpMeshMaterial
-{
+class hkpNamedMeshMaterial : public hkpMeshMaterial {
 public:
-	hkStringPtr m_name;
+  hkStringPtr m_name;
 };
 
-class hkpCompressedMeshShapeBigTriangle
-{
+class hkpCompressedMeshShapeBigTriangle {
 public:
-	uint16 m_a;
-	uint16 m_b;
-	uint16 m_c;
-	uint32 m_material;
-	uint16 m_weldingInfo;
-	uint16 m_transformIndex;
+  uint16 m_a;
+  uint16 m_b;
+  uint16 m_c;
+  uint32 m_material;
+  uint16 m_weldingInfo;
+  uint16 m_transformIndex;
 };
 
-class hkpCompressedMeshShape : public hkpShapeCollection
-{
+class hkpCompressedMeshShape : public hkpShapeCollection {
 public:
-	virtual ~hkpCompressedMeshShape();
-	int32 m_bitsPerIndex;
-	int32 m_bitsPerWIndex;
-	int32 m_wIndexMask;
-	int32 m_indexMask;
-	float m_radius;
-	uint8 m_weldingType;
-	uint8 m_materialType;
-	hkArray<uint32> m_materials;
-	hkArray<uint16> m_materials16;
-	hkArray<uint8> m_materials8;
-	hkArray<hkQsTransform> m_transforms;
-	hkArray<hkVector4> m_bigVertices;
-	hkArray<hkpCompressedMeshShapeBigTriangle> m_bigTriangles;
-	hkArray<hkpCompressedMeshShapeChunk> m_chunks;
-	hkArray<hkpCompressedMeshShapeConvexPiece> m_convexPieces;
-	float m_error;
-	hkAabb m_bounds;
-	uint32 m_defaultCollisionFilterInfo;
-	void *m_meshMaterials;
-	uint16 m_materialStriding;
-	uint16 m_numMaterials;
-	hkArray<hkpNamedMeshMaterial> m_namedMaterials;
+  virtual ~hkpCompressedMeshShape();
+  int32 m_bitsPerIndex;
+  int32 m_bitsPerWIndex;
+  int32 m_wIndexMask;
+  int32 m_indexMask;
+  float m_radius;
+  uint8 m_weldingType;
+  uint8 m_materialType;
+  hkArray<uint32> m_materials;
+  hkArray<uint16> m_materials16;
+  hkArray<uint8> m_materials8;
+  hkArray<hkQsTransform> m_transforms;
+  hkArray<hkVector4> m_bigVertices;
+  hkArray<hkpCompressedMeshShapeBigTriangle> m_bigTriangles;
+  hkArray<hkpCompressedMeshShapeChunk> m_chunks;
+  hkArray<hkpCompressedMeshShapeConvexPiece> m_convexPieces;
+  float m_error;
+  hkAabb m_bounds;
+  uint32 m_defaultCollisionFilterInfo;
+  void *m_meshMaterials;
+  uint16 m_materialStriding;
+  uint16 m_numMaterials;
+  hkArray<hkpNamedMeshMaterial> m_namedMaterials;
 };
 
-class hkpConvexVerticesShapeFourVectors
-{
+class hkpConvexVerticesShapeFourVectors {
 public:
-	hkVector4 m_x;
-	hkVector4 m_y;
-	hkVector4 m_z;
+  hkVector4 m_x;
+  hkVector4 m_y;
+  hkVector4 m_z;
 };
 
-class hkpConvexVerticesShape : public hkpConvexShape
-{
+class hkpConvexVerticesShape : public hkpConvexShape {
 public:
-	virtual ~hkpConvexVerticesShape();
-	hkVector4 m_aabbHalfExtents;
-	hkVector4 m_aabbCenter;
-	hkArray<hkpConvexVerticesShapeFourVectors> m_rotatedVertices;
-	int32 m_numVertices;
-	void *m_externalObject;
-	void *m_getFaceNormals;
-	hkArray<hkVector4> m_planeEquations;
-	hkpConvexVerticesConnectivity *m_connectivity;
+  virtual ~hkpConvexVerticesShape();
+  hkVector4 m_aabbHalfExtents;
+  hkVector4 m_aabbCenter;
+  hkArray<hkpConvexVerticesShapeFourVectors> m_rotatedVertices;
+  int32 m_numVertices;
+  void *m_externalObject;
+  void *m_getFaceNormals;
+  hkArray<hkVector4> m_planeEquations;
+  hkpConvexVerticesConnectivity *m_connectivity;
 };
 
-class hkpConvexPieceStreamData : public hkReferencedObject
-{
+class hkpConvexPieceStreamData : public hkReferencedObject {
 public:
-	virtual ~hkpConvexPieceStreamData();
-	hkArray<uint32> m_convexPieceStream;
-	hkArray<uint32> m_convexPieceOffsets;
-	hkArray<uint32> m_convexPieceSingleTriangles;
+  virtual ~hkpConvexPieceStreamData();
+  hkArray<uint32> m_convexPieceStream;
+  hkArray<uint32> m_convexPieceOffsets;
+  hkArray<uint32> m_convexPieceSingleTriangles;
 };
 
-class hkpConvexPieceMeshShape : public hkpShapeCollection
-{
+class hkpConvexPieceMeshShape : public hkpShapeCollection {
 public:
-	virtual ~hkpConvexPieceMeshShape();
-	hkpConvexPieceStreamData *m_convexPieceStream;
-	hkpShapeCollection *m_displayMesh;
-	float m_radius;
+  virtual ~hkpConvexPieceMeshShape();
+  hkpConvexPieceStreamData *m_convexPieceStream;
+  hkpShapeCollection *m_displayMesh;
+  float m_radius;
 };
 
-class hkpExtendedMeshShapeSubpart
-{
+class hkpExtendedMeshShapeSubpart {
 public:
-	int8 m_type;
-	int8 m_materialIndexStridingType;
-	int16 m_materialStriding;
-	void *m_materialIndexBase;
-	uint16 m_materialIndexStriding;
-	uint16 m_numMaterials;
-	void *m_materialBase;
-	uint64 m_userData;
+  int8 m_type;
+  int8 m_materialIndexStridingType;
+  int16 m_materialStriding;
+  void *m_materialIndexBase;
+  uint16 m_materialIndexStriding;
+  uint16 m_numMaterials;
+  void *m_materialBase;
+  uint64 m_userData;
 };
 
-class hkpExtendedMeshShapeShapesSubpart : public hkpExtendedMeshShapeSubpart
-{
+class hkpExtendedMeshShapeShapesSubpart : public hkpExtendedMeshShapeSubpart {
 public:
-	hkArray<hkpConvexShape *> m_childShapes;
-	hkQuaternion m_rotation;
-	hkVector4 m_translation;
+  hkArray<hkpConvexShape *> m_childShapes;
+  hkQuaternion m_rotation;
+  hkVector4 m_translation;
 };
 
-class hkpExtendedMeshShapeTrianglesSubpart : public hkpExtendedMeshShapeSubpart
-{
+class hkpExtendedMeshShapeTrianglesSubpart
+    : public hkpExtendedMeshShapeSubpart {
 public:
-	int32 m_numTriangleShapes;
-	void *m_vertexBase;
-	int32 m_numVertices;
-	void *m_indexBase;
-	uint16 m_vertexStriding;
-	int32 m_triangleOffset;
-	uint16 m_indexStriding;
-	int8 m_stridingType;
-	int8 m_flipAlternateTriangles;
-	hkVector4 m_extrusion;
-	hkQsTransform m_transform;
+  int32 m_numTriangleShapes;
+  void *m_vertexBase;
+  int32 m_numVertices;
+  void *m_indexBase;
+  uint16 m_vertexStriding;
+  int32 m_triangleOffset;
+  uint16 m_indexStriding;
+  int8 m_stridingType;
+  int8 m_flipAlternateTriangles;
+  hkVector4 m_extrusion;
+  hkQsTransform m_transform;
 };
 
-class hkpExtendedMeshShape : public hkpShapeCollection
-{
+class hkpExtendedMeshShape : public hkpShapeCollection {
 public:
-	virtual ~hkpExtendedMeshShape();
-	hkpExtendedMeshShapeTrianglesSubpart m_embeddedTrianglesSubpart;
-	hkVector4 m_aabbHalfExtents;
-	hkVector4 m_aabbCenter;
-	void *m_materialClass;
-	int32 m_numBitsForSubpartIndex;
-	hkArray<hkpExtendedMeshShapeTrianglesSubpart> m_trianglesSubparts;
-	hkArray<hkpExtendedMeshShapeShapesSubpart> m_shapesSubparts;
-	hkArray<uint16> m_weldingInfo;
-	uint8 m_weldingType;
-	uint32 m_defaultCollisionFilterInfo;
-	int32 m_cachedNumChildShapes;
-	float m_triangleRadius;
-	int32 m_padding;
+  virtual ~hkpExtendedMeshShape();
+  hkpExtendedMeshShapeTrianglesSubpart m_embeddedTrianglesSubpart;
+  hkVector4 m_aabbHalfExtents;
+  hkVector4 m_aabbCenter;
+  void *m_materialClass;
+  int32 m_numBitsForSubpartIndex;
+  hkArray<hkpExtendedMeshShapeTrianglesSubpart> m_trianglesSubparts;
+  hkArray<hkpExtendedMeshShapeShapesSubpart> m_shapesSubparts;
+  hkArray<uint16> m_weldingInfo;
+  uint8 m_weldingType;
+  uint32 m_defaultCollisionFilterInfo;
+  int32 m_cachedNumChildShapes;
+  float m_triangleRadius;
+  int32 m_padding;
 };
 
-class hkpStorageExtendedMeshShapeMaterial : public hkpMeshMaterial
-{
+class hkpStorageExtendedMeshShapeMaterial : public hkpMeshMaterial {
 public:
-	hkHalf m_restitution;
-	hkHalf m_friction;
-	uint64 m_userData;
+  hkHalf m_restitution;
+  hkHalf m_friction;
+  uint64 m_userData;
 };
 
-class hkpStorageExtendedMeshShapeShapeSubpartStorage : public hkReferencedObject
-{
+class hkpStorageExtendedMeshShapeShapeSubpartStorage
+    : public hkReferencedObject {
 public:
-	virtual ~hkpStorageExtendedMeshShapeShapeSubpartStorage();
-	hkArray<uint8> m_materialIndices;
-	hkArray<hkpStorageExtendedMeshShapeMaterial> m_materials;
-	hkArray<uint16> m_materialIndices16;
+  virtual ~hkpStorageExtendedMeshShapeShapeSubpartStorage();
+  hkArray<uint8> m_materialIndices;
+  hkArray<hkpStorageExtendedMeshShapeMaterial> m_materials;
+  hkArray<uint16> m_materialIndices16;
 };
 
-class hkpStorageExtendedMeshShapeMeshSubpartStorage : public hkReferencedObject
-{
+class hkpStorageExtendedMeshShapeMeshSubpartStorage
+    : public hkReferencedObject {
 public:
-	virtual ~hkpStorageExtendedMeshShapeMeshSubpartStorage();
-	hkArray<hkVector4> m_vertices;
-	hkArray<uint8> m_indices8;
-	hkArray<uint16> m_indices16;
-	hkArray<uint32> m_indices32;
-	hkArray<uint8> m_materialIndices;
-	hkArray<hkpStorageExtendedMeshShapeMaterial> m_materials;
-	hkArray<hkpNamedMeshMaterial> m_namedMaterials;
-	hkArray<uint16> m_materialIndices16;
+  virtual ~hkpStorageExtendedMeshShapeMeshSubpartStorage();
+  hkArray<hkVector4> m_vertices;
+  hkArray<uint8> m_indices8;
+  hkArray<uint16> m_indices16;
+  hkArray<uint32> m_indices32;
+  hkArray<uint8> m_materialIndices;
+  hkArray<hkpStorageExtendedMeshShapeMaterial> m_materials;
+  hkArray<hkpNamedMeshMaterial> m_namedMaterials;
+  hkArray<uint16> m_materialIndices16;
 };
 
-class hkpStorageExtendedMeshShape : public hkpExtendedMeshShape
-{
+class hkpStorageExtendedMeshShape : public hkpExtendedMeshShape {
 public:
-	virtual ~hkpStorageExtendedMeshShape();
-	hkArray<hkpStorageExtendedMeshShapeMeshSubpartStorage *> m_meshstorage;
-	hkArray<hkpStorageExtendedMeshShapeShapeSubpartStorage *> m_shapestorage;
+  virtual ~hkpStorageExtendedMeshShape();
+  hkArray<hkpStorageExtendedMeshShapeMeshSubpartStorage *> m_meshstorage;
+  hkArray<hkpStorageExtendedMeshShapeShapeSubpartStorage *> m_shapestorage;
 };
 
-class hkpHeightFieldShape : public hkpShape
-{
+class hkpHeightFieldShape : public hkpShape {
 public:
 };
 
-class hkpSampledHeightFieldShape : public hkpHeightFieldShape
-{
+class hkpSampledHeightFieldShape : public hkpHeightFieldShape {
 public:
-	int32 m_xRes;
-	int32 m_zRes;
-	float m_heightCenter;
-	bool m_useProjectionBasedHeight;
-	uint8 m_heightfieldType;
-	hkVector4 m_intToFloatScale;
-	hkVector4 m_floatToIntScale;
-	hkVector4 m_floatToIntOffsetFloorCorrected;
-	hkVector4 m_extents;
+  int32 m_xRes;
+  int32 m_zRes;
+  float m_heightCenter;
+  bool m_useProjectionBasedHeight;
+  uint8 m_heightfieldType;
+  hkVector4 m_intToFloatScale;
+  hkVector4 m_floatToIntScale;
+  hkVector4 m_floatToIntOffsetFloorCorrected;
+  hkVector4 m_extents;
 };
 
-class hkpCompressedSampledHeightFieldShape : public hkpSampledHeightFieldShape
-{
+class hkpCompressedSampledHeightFieldShape : public hkpSampledHeightFieldShape {
 public:
-	virtual ~hkpCompressedSampledHeightFieldShape();
-	hkArray<uint16> m_storage;
-	bool m_triangleFlip;
-	float m_offset;
-	float m_scale;
+  virtual ~hkpCompressedSampledHeightFieldShape();
+  hkArray<uint16> m_storage;
+  bool m_triangleFlip;
+  float m_offset;
+  float m_scale;
 };
 
-class hkpPlaneShape : public hkpHeightFieldShape
-{
+class hkpPlaneShape : public hkpHeightFieldShape {
 public:
-	virtual ~hkpPlaneShape();
-	hkVector4 m_plane;
-	hkVector4 m_aabbCenter;
-	hkVector4 m_aabbHalfExtents;
+  virtual ~hkpPlaneShape();
+  hkVector4 m_plane;
+  hkVector4 m_aabbCenter;
+  hkVector4 m_aabbHalfExtents;
 };
 
-class hkpStorageSampledHeightFieldShape : public hkpSampledHeightFieldShape
-{
+class hkpStorageSampledHeightFieldShape : public hkpSampledHeightFieldShape {
 public:
-	virtual ~hkpStorageSampledHeightFieldShape();
-	hkArray<float> m_storage;
-	bool m_triangleFlip;
+  virtual ~hkpStorageSampledHeightFieldShape();
+  hkArray<float> m_storage;
+  bool m_triangleFlip;
 };
 
-class hkpTriSampledHeightFieldBvTreeShape : public hkpBvTreeShape
-{
+class hkpTriSampledHeightFieldBvTreeShape : public hkpBvTreeShape {
 public:
-	virtual ~hkpTriSampledHeightFieldBvTreeShape();
-	hkpSingleShapeContainer m_childContainer;
-	int32 m_childSize;
-	bool m_wantAabbRejectionTest;
-	uint8 m_padding;
+  virtual ~hkpTriSampledHeightFieldBvTreeShape();
+  hkpSingleShapeContainer m_childContainer;
+  int32 m_childSize;
+  bool m_wantAabbRejectionTest;
+  uint8 m_padding;
 };
 
-class hkpTriSampledHeightFieldCollection : public hkpShapeCollection
-{
+class hkpTriSampledHeightFieldCollection : public hkpShapeCollection {
 public:
-	virtual ~hkpTriSampledHeightFieldCollection();
-	hkpSampledHeightFieldShape *m_heightfield;
-	int32 m_childSize;
-	float m_radius;
-	hkArray<uint16> m_weldingInfo;
-	hkVector4 m_triangleExtrusion;
+  virtual ~hkpTriSampledHeightFieldCollection();
+  hkpSampledHeightFieldShape *m_heightfield;
+  int32 m_childSize;
+  float m_radius;
+  hkArray<uint16> m_weldingInfo;
+  hkVector4 m_triangleExtrusion;
 };
 
-class hkpMeshShapeSubpart
-{
+class hkpMeshShapeSubpart {
 public:
-	void *m_vertexBase;
-	int32 m_vertexStriding;
-	int32 m_numVertices;
-	void *m_indexBase;
-	int8 m_stridingType;
-	int8 m_materialIndexStridingType;
-	int32 m_indexStriding;
-	int32 m_flipAlternateTriangles;
-	int32 m_numTriangles;
-	void *m_materialIndexBase;
-	int32 m_materialIndexStriding;
-	void *m_materialBase;
-	int32 m_materialStriding;
-	int32 m_numMaterials;
-	int32 m_triangleOffset;
+  void *m_vertexBase;
+  int32 m_vertexStriding;
+  int32 m_numVertices;
+  void *m_indexBase;
+  int8 m_stridingType;
+  int8 m_materialIndexStridingType;
+  int32 m_indexStriding;
+  int32 m_flipAlternateTriangles;
+  int32 m_numTriangles;
+  void *m_materialIndexBase;
+  int32 m_materialIndexStriding;
+  void *m_materialBase;
+  int32 m_materialStriding;
+  int32 m_numMaterials;
+  int32 m_triangleOffset;
 };
 
-class hkpMeshShape : public hkpShapeCollection
-{
+class hkpMeshShape : public hkpShapeCollection {
 public:
-	virtual ~hkpMeshShape();
-	hkVector4 m_scaling;
-	int32 m_numBitsForSubpartIndex;
-	hkArray<hkpMeshShapeSubpart> m_subparts;
-	hkArray<uint16> m_weldingInfo;
-	uint8 m_weldingType;
-	float m_radius;
-	int32 m_pad;
+  virtual ~hkpMeshShape();
+  hkVector4 m_scaling;
+  int32 m_numBitsForSubpartIndex;
+  hkArray<hkpMeshShapeSubpart> m_subparts;
+  hkArray<uint16> m_weldingInfo;
+  uint8 m_weldingType;
+  float m_radius;
+  int32 m_pad;
 };
 
-class hkpFastMeshShape : public hkpMeshShape
-{
+class hkpFastMeshShape : public hkpMeshShape {
 public:
-	virtual ~hkpFastMeshShape();
+  virtual ~hkpFastMeshShape();
 };
 
-class hkpStorageMeshShapeSubpartStorage : public hkReferencedObject
-{
+class hkpStorageMeshShapeSubpartStorage : public hkReferencedObject {
 public:
-	virtual ~hkpStorageMeshShapeSubpartStorage();
-	hkArray<float> m_vertices;
-	hkArray<uint16> m_indices16;
-	hkArray<uint32> m_indices32;
-	hkArray<uint8> m_materialIndices;
-	hkArray<uint32> m_materials;
-	hkArray<uint16> m_materialIndices16;
+  virtual ~hkpStorageMeshShapeSubpartStorage();
+  hkArray<float> m_vertices;
+  hkArray<uint16> m_indices16;
+  hkArray<uint32> m_indices32;
+  hkArray<uint8> m_materialIndices;
+  hkArray<uint32> m_materials;
+  hkArray<uint16> m_materialIndices16;
 };
 
-class hkpStorageMeshShape : public hkpMeshShape
-{
+class hkpStorageMeshShape : public hkpMeshShape {
 public:
-	virtual ~hkpStorageMeshShape();
-	hkArray<hkpStorageMeshShapeSubpartStorage *> m_storage;
+  virtual ~hkpStorageMeshShape();
+  hkArray<hkpStorageMeshShapeSubpartStorage *> m_storage;
 };
 
-class hkpSimpleMeshShapeTriangle
-{
+class hkpSimpleMeshShapeTriangle {
 public:
-	int32 m_a;
-	int32 m_b;
-	int32 m_c;
-	uint16 m_weldingInfo;
+  int32 m_a;
+  int32 m_b;
+  int32 m_c;
+  uint16 m_weldingInfo;
 };
 
-class hkpSimpleMeshShape : public hkpShapeCollection
-{
+class hkpSimpleMeshShape : public hkpShapeCollection {
 public:
-	virtual ~hkpSimpleMeshShape();
-	hkArray<hkVector4> m_vertices;
-	hkArray<hkpSimpleMeshShapeTriangle> m_triangles;
-	hkArray<uint8> m_materialIndices;
-	float m_radius;
-	uint8 m_weldingType;
+  virtual ~hkpSimpleMeshShape();
+  hkArray<hkVector4> m_vertices;
+  hkArray<hkpSimpleMeshShapeTriangle> m_triangles;
+  hkArray<uint8> m_materialIndices;
+  float m_radius;
+  uint8 m_weldingType;
 };
 
-class hkMultiThreadCheck
-{
+class hkMultiThreadCheck {
 public:
-	uint32 m_threadId;
-	int32 m_stackTraceId;
-	uint16 m_markCount;
-	uint16 m_markBitStack;
+  uint32 m_threadId;
+  int32 m_stackTraceId;
+  uint16 m_markCount;
+  uint16 m_markBitStack;
 };
 
-class hkpCollidableBoundingVolumeData
-{
+class hkpCollidableBoundingVolumeData {
 public:
-	uint32 m_min;
-	uint8 m_expansionMin;
-	uint8 m_expansionShift;
-	uint32 m_max;
-	uint8 m_expansionMax;
-	uint8 m_padding;
-	uint16 m_numChildShapeAabbs;
-	uint16 m_capacityChildShapeAabbs;
-	void *m_childShapeAabbs;
-	void *m_childShapeKeys;
+  uint32 m_min;
+  uint8 m_expansionMin;
+  uint8 m_expansionShift;
+  uint32 m_max;
+  uint8 m_expansionMax;
+  uint8 m_padding;
+  uint16 m_numChildShapeAabbs;
+  uint16 m_capacityChildShapeAabbs;
+  void *m_childShapeAabbs;
+  void *m_childShapeKeys;
 };
 
-class hkpCdBody
-{
+class hkpCdBody {
 public:
-	hkpShape *m_shape;
-	uint32 m_shapeKey;
-	void *m_motion;
-	hkpCdBody *m_parent;
+  hkpShape *m_shape;
+  uint32 m_shapeKey;
+  void *m_motion;
+  hkpCdBody *m_parent;
 };
 
-class hkpBroadPhaseHandle
-{
+class hkpBroadPhaseHandle {
 public:
-	uint32 m_id;
+  uint32 m_id;
 };
 
-class hkpTypedBroadPhaseHandle : public hkpBroadPhaseHandle
-{
+class hkpTypedBroadPhaseHandle : public hkpBroadPhaseHandle {
 public:
-	int8 m_type;
-	int8 m_ownerOffset;
-	int8 m_objectQualityType;
-	uint32 m_collisionFilterInfo;
+  int8 m_type;
+  int8 m_ownerOffset;
+  int8 m_objectQualityType;
+  uint32 m_collisionFilterInfo;
 };
 
-class hkpCollidable : public hkpCdBody
-{
+class hkpCollidable : public hkpCdBody {
 public:
-	int8 m_ownerOffset;
-	uint8 m_forceCollideOntoPpu;
-	uint16 m_shapeSizeOnSpu;
-	hkpTypedBroadPhaseHandle m_broadPhaseHandle;
-	hkpCollidableBoundingVolumeData m_boundingVolumeData;
-	float m_allowedPenetrationDepth;
+  int8 m_ownerOffset;
+  uint8 m_forceCollideOntoPpu;
+  uint16 m_shapeSizeOnSpu;
+  hkpTypedBroadPhaseHandle m_broadPhaseHandle;
+  hkpCollidableBoundingVolumeData m_boundingVolumeData;
+  float m_allowedPenetrationDepth;
 };
 
-class hkpLinkedCollidable : public hkpCollidable
-{
+class hkpLinkedCollidable : public hkpCollidable {
 public:
-	hkArray<void> m_collisionEntries;
+  hkArray<void> m_collisionEntries;
 };
 
-class hkpPropertyValue
-{
+class hkpPropertyValue {
 public:
-	uint64 m_data;
+  uint64 m_data;
 };
 
-class hkpProperty
-{
+class hkpProperty {
 public:
-	uint32 m_key;
-	uint32 m_alignmentPadding;
-	hkpPropertyValue m_value;
+  uint32 m_key;
+  uint32 m_alignmentPadding;
+  hkpPropertyValue m_value;
 };
 
-class hkpWorldObject : public hkReferencedObject
-{
+class hkpWorldObject : public hkReferencedObject {
 public:
-	void *m_world;
-	uint64 m_userData;
-	hkpLinkedCollidable m_collidable;
-	hkMultiThreadCheck m_multiThreadCheck;
-	hkStringPtr m_name;
-	hkArray<hkpProperty> m_properties;
-	void *m_treeData;
+  void *m_world;
+  uint64 m_userData;
+  hkpLinkedCollidable m_collidable;
+  hkMultiThreadCheck m_multiThreadCheck;
+  hkStringPtr m_name;
+  hkArray<hkpProperty> m_properties;
+  void *m_treeData;
 };
 
-class hkpPhantom : public hkpWorldObject
-{
+class hkpPhantom : public hkpWorldObject {
 public:
-	hkArray<void *> m_overlapListeners;
-	hkArray<void *> m_phantomListeners;
+  hkArray<void *> m_overlapListeners;
+  hkArray<void *> m_phantomListeners;
 };
 
-class hkpAabbPhantom : public hkpPhantom
-{
+class hkpAabbPhantom : public hkpPhantom {
 public:
-	virtual ~hkpAabbPhantom();
-	hkAabb m_aabb;
-	hkArray<void *> m_overlappingCollidables;
-	bool m_orderDirty;
+  virtual ~hkpAabbPhantom();
+  hkAabb m_aabb;
+  hkArray<void *> m_overlappingCollidables;
+  bool m_orderDirty;
 };
 
-class hkpConstraintData : public hkReferencedObject
-{
+class hkpConstraintData : public hkReferencedObject {
 public:
-	uint64 m_userData;
+  uint64 m_userData;
 };
 
-class hkpConstraintAtom
-{
+class hkpConstraintAtom {
 public:
-	uint16 m_type;
+  uint16 m_type;
 };
 
-class hkpSetupStabilizationAtom : public hkpConstraintAtom
-{
+class hkpSetupStabilizationAtom : public hkpConstraintAtom {
 public:
-	bool m_enabled;
-	float m_maxAngle;
-	uint8 m_padding;
+  bool m_enabled;
+  float m_maxAngle;
+  uint8 m_padding;
 };
 
-class hkpBallSocketConstraintAtom : public hkpConstraintAtom
-{
+class hkpBallSocketConstraintAtom : public hkpConstraintAtom {
 public:
-	uint8 m_solvingMethod;
-	uint8 m_bodiesToNotify;
-	uint8 m_velocityStabilizationFactor;
-	float m_maxImpulse;
-	float m_inertiaStabilizationFactor;
+  uint8 m_solvingMethod;
+  uint8 m_bodiesToNotify;
+  uint8 m_velocityStabilizationFactor;
+  float m_maxImpulse;
+  float m_inertiaStabilizationFactor;
 };
 
-class hkpSetLocalTranslationsConstraintAtom : public hkpConstraintAtom
-{
+class hkpSetLocalTranslationsConstraintAtom : public hkpConstraintAtom {
 public:
-	hkVector4 m_translationA;
-	hkVector4 m_translationB;
+  hkVector4 m_translationA;
+  hkVector4 m_translationB;
 };
 
-class hkpBallAndSocketConstraintDataAtoms
-{
+class hkpBallAndSocketConstraintDataAtoms {
 public:
-	hkpSetLocalTranslationsConstraintAtom m_pivots;
-	hkpSetupStabilizationAtom m_setupStabilization;
-	hkpBallSocketConstraintAtom m_ballSocket;
+  hkpSetLocalTranslationsConstraintAtom m_pivots;
+  hkpSetupStabilizationAtom m_setupStabilization;
+  hkpBallSocketConstraintAtom m_ballSocket;
 };
 
-class hkpBallAndSocketConstraintData : public hkpConstraintData
-{
+class hkpBallAndSocketConstraintData : public hkpConstraintData {
 public:
-	virtual ~hkpBallAndSocketConstraintData();
-	hkpBallAndSocketConstraintDataAtoms m_atoms;
+  virtual ~hkpBallAndSocketConstraintData();
+  hkpBallAndSocketConstraintDataAtoms m_atoms;
 };
 
-class hkpBridgeConstraintAtom : public hkpConstraintAtom
-{
+class hkpBridgeConstraintAtom : public hkpConstraintAtom {
 public:
-	void *m_buildJacobianFunc;
-	hkpConstraintData *m_constraintData;
+  void *m_buildJacobianFunc;
+  hkpConstraintData *m_constraintData;
 };
 
-class hkpBridgeAtoms
-{
+class hkpBridgeAtoms {
 public:
-	hkpBridgeConstraintAtom m_bridgeAtom;
+  hkpBridgeConstraintAtom m_bridgeAtom;
 };
 
-class hkpConstraintChainData : public hkpConstraintData
-{
+class hkpConstraintChainData : public hkpConstraintData {
 public:
 };
 
-class hkpBallSocketChainDataConstraintInfo
-{
+class hkpBallSocketChainDataConstraintInfo {
 public:
-	hkVector4 m_pivotInA;
-	hkVector4 m_pivotInB;
+  hkVector4 m_pivotInA;
+  hkVector4 m_pivotInB;
 };
 
-class hkpBallSocketChainData : public hkpConstraintChainData
-{
+class hkpBallSocketChainData : public hkpConstraintChainData {
 public:
-	virtual ~hkpBallSocketChainData();
-	hkpBridgeAtoms m_atoms;
-	hkArray<hkpBallSocketChainDataConstraintInfo> m_infos;
-	float m_tau;
-	float m_damping;
-	float m_cfm;
-	float m_maxErrorDistance;
+  virtual ~hkpBallSocketChainData();
+  hkpBridgeAtoms m_atoms;
+  hkArray<hkpBallSocketChainDataConstraintInfo> m_infos;
+  float m_tau;
+  float m_damping;
+  float m_cfm;
+  float m_maxErrorDistance;
 };
 
-class hkSweptTransform
-{
+class hkSweptTransform {
 public:
-	hkVector4 m_centerOfMass0;
-	hkVector4 m_centerOfMass1;
-	hkQuaternion m_rotation0;
-	hkQuaternion m_rotation1;
-	hkVector4 m_centerOfMassLocal;
+  hkVector4 m_centerOfMass0;
+  hkVector4 m_centerOfMass1;
+  hkQuaternion m_rotation0;
+  hkQuaternion m_rotation1;
+  hkVector4 m_centerOfMassLocal;
 };
 
-class hkMotionState
-{
+class hkMotionState {
 public:
-	hkTransform m_transform;
-	hkSweptTransform m_sweptTransform;
-	hkVector4 m_deltaAngle;
-	float m_objectRadius;
-	hkHalf m_linearDamping;
-	hkHalf m_angularDamping;
-	hkHalf m_timeFactor;
-	uint8 m_maxLinearVelocity;
-	uint8 m_maxAngularVelocity;
-	uint8 m_deactivationClass;
+  hkTransform m_transform;
+  hkSweptTransform m_sweptTransform;
+  hkVector4 m_deltaAngle;
+  float m_objectRadius;
+  hkHalf m_linearDamping;
+  hkHalf m_angularDamping;
+  hkHalf m_timeFactor;
+  uint8 m_maxLinearVelocity;
+  uint8 m_maxAngularVelocity;
+  uint8 m_deactivationClass;
 };
 
-class hkpMotion : public hkReferencedObject
-{
+class hkpMotion : public hkReferencedObject {
 public:
-	uint8 m_type;
-	uint8 m_deactivationIntegrateCounter;
-	uint16 m_deactivationNumInactiveFrames;
-	hkMotionState m_motionState;
-	hkVector4 m_inertiaAndMassInv;
-	hkVector4 m_linearVelocity;
-	hkVector4 m_angularVelocity;
-	hkVector4 m_deactivationRefPosition;
-	uint32 m_deactivationRefOrientation;
-	class hkpMaxSizeMotion *m_savedMotion;
-	uint16 m_savedQualityTypeIndex;
-	hkHalf m_gravityFactor;
+  uint8 m_type;
+  uint8 m_deactivationIntegrateCounter;
+  uint16 m_deactivationNumInactiveFrames;
+  hkMotionState m_motionState;
+  hkVector4 m_inertiaAndMassInv;
+  hkVector4 m_linearVelocity;
+  hkVector4 m_angularVelocity;
+  hkVector4 m_deactivationRefPosition;
+  uint32 m_deactivationRefOrientation;
+  class hkpMaxSizeMotion *m_savedMotion;
+  uint16 m_savedQualityTypeIndex;
+  hkHalf m_gravityFactor;
 };
 
-class hkpKeyframedRigidMotion : public hkpMotion
-{
+class hkpKeyframedRigidMotion : public hkpMotion {
 public:
-	virtual ~hkpKeyframedRigidMotion();
+  virtual ~hkpKeyframedRigidMotion();
 };
 
-class hkpMaxSizeMotion : public hkpKeyframedRigidMotion
-{
+class hkpMaxSizeMotion : public hkpKeyframedRigidMotion {
 public:
-	virtual ~hkpMaxSizeMotion();
+  virtual ~hkpMaxSizeMotion();
 };
 
-class hkpBoxMotion : public hkpMotion
-{
+class hkpBoxMotion : public hkpMotion {
 public:
-	virtual ~hkpBoxMotion();
+  virtual ~hkpBoxMotion();
 };
 
-class hkpBreakableConstraintData : public hkpConstraintData
-{
+class hkpBreakableConstraintData : public hkpConstraintData {
 public:
-	virtual ~hkpBreakableConstraintData();
-	hkpBridgeAtoms m_atoms;
-	hkpConstraintData *m_constraintData;
-	uint16 m_childRuntimeSize;
-	uint16 m_childNumSolverResults;
-	float m_solverResultLimit;
-	bool m_removeWhenBroken;
-	bool m_revertBackVelocityOnBreak;
+  virtual ~hkpBreakableConstraintData();
+  hkpBridgeAtoms m_atoms;
+  hkpConstraintData *m_constraintData;
+  uint16 m_childRuntimeSize;
+  uint16 m_childNumSolverResults;
+  float m_solverResultLimit;
+  bool m_removeWhenBroken;
+  bool m_revertBackVelocityOnBreak;
 };
 
-class hkpShapePhantom : public hkpPhantom
-{
+class hkpShapePhantom : public hkpPhantom {
 public:
-	hkMotionState m_motionState;
+  hkMotionState m_motionState;
 };
 
-class hkpCachingShapePhantom : public hkpShapePhantom
-{
+class hkpCachingShapePhantom : public hkpShapePhantom {
 public:
-	virtual ~hkpCachingShapePhantom();
-	hkArray<void> m_collisionDetails;
-	bool m_orderDirty;
+  virtual ~hkpCachingShapePhantom();
+  hkArray<void> m_collisionDetails;
+  bool m_orderDirty;
 };
 
-class hkpConstraintMotor : public hkReferencedObject
-{
+class hkpConstraintMotor : public hkReferencedObject {
 public:
-	int8 m_type;
+  int8 m_type;
 };
 
-class hkpLimitedForceConstraintMotor : public hkpConstraintMotor
-{
+class hkpLimitedForceConstraintMotor : public hkpConstraintMotor {
 public:
-	float m_minForce;
-	float m_maxForce;
+  float m_minForce;
+  float m_maxForce;
 };
 
-class hkpCallbackConstraintMotor : public hkpLimitedForceConstraintMotor
-{
+class hkpCallbackConstraintMotor : public hkpLimitedForceConstraintMotor {
 public:
-	virtual ~hkpCallbackConstraintMotor();
-	void *m_callbackFunc;
-	uint32 m_callbackType;
-	uint64 m_userData0;
-	uint64 m_userData1;
-	uint64 m_userData2;
+  virtual ~hkpCallbackConstraintMotor();
+  void *m_callbackFunc;
+  uint32 m_callbackType;
+  uint64 m_userData0;
+  uint64 m_userData1;
+  uint64 m_userData2;
 };
 
-class hkpCharacterMotion : public hkpMotion
-{
+class hkpCharacterMotion : public hkpMotion {
 public:
-	virtual ~hkpCharacterMotion();
+  virtual ~hkpCharacterMotion();
 };
 
-class hkpSetLocalTransformsConstraintAtom : public hkpConstraintAtom
-{
+class hkpSetLocalTransformsConstraintAtom : public hkpConstraintAtom {
 public:
-	hkTransform m_transformA;
-	hkTransform m_transformB;
+  hkTransform m_transformA;
+  hkTransform m_transformB;
 };
 
-class hkpCogWheelConstraintAtom : public hkpConstraintAtom
-{
+class hkpCogWheelConstraintAtom : public hkpConstraintAtom {
 public:
-	float m_cogWheelRadiusA;
-	float m_cogWheelRadiusB;
-	bool m_isScrew;
-	int8 m_memOffsetToInitialAngleOffset;
-	int8 m_memOffsetToPrevAngle;
-	int8 m_memOffsetToRevolutionCounter;
+  float m_cogWheelRadiusA;
+  float m_cogWheelRadiusB;
+  bool m_isScrew;
+  int8 m_memOffsetToInitialAngleOffset;
+  int8 m_memOffsetToPrevAngle;
+  int8 m_memOffsetToRevolutionCounter;
 };
 
-class hkpCogWheelConstraintDataAtoms
-{
+class hkpCogWheelConstraintDataAtoms {
 public:
-	hkpSetLocalTransformsConstraintAtom m_transforms;
-	hkpCogWheelConstraintAtom m_cogWheels;
+  hkpSetLocalTransformsConstraintAtom m_transforms;
+  hkpCogWheelConstraintAtom m_cogWheels;
 };
 
-class hkpCogWheelConstraintData : public hkpConstraintData
-{
+class hkpCogWheelConstraintData : public hkpConstraintData {
 public:
-	virtual ~hkpCogWheelConstraintData();
-	hkpCogWheelConstraintDataAtoms m_atoms;
+  virtual ~hkpCogWheelConstraintData();
+  hkpCogWheelConstraintDataAtoms m_atoms;
 };
 
-class hkpAction : public hkReferencedObject
-{
+class hkpAction : public hkReferencedObject {
 public:
-	void *m_world;
-	void *m_island;
-	uint64 m_userData;
-	hkStringPtr m_name;
+  void *m_world;
+  void *m_island;
+  uint64 m_userData;
+  hkStringPtr m_name;
 };
 
-class hkpConstraintChainInstanceAction : public hkpAction
-{
+class hkpConstraintChainInstanceAction : public hkpAction {
 public:
-	virtual ~hkpConstraintChainInstanceAction();
-	class hkpConstraintChainInstance *m_constraintInstance;
+  virtual ~hkpConstraintChainInstanceAction();
+  class hkpConstraintChainInstance *m_constraintInstance;
 };
 
-class hkpEntitySmallArraySerializeOverrideType
-{
+class hkpEntitySmallArraySerializeOverrideType {
 public:
-	void *m_data;
-	uint16 m_size;
-	uint16 m_capacityAndFlags;
+  void *m_data;
+  uint16 m_size;
+  uint16 m_capacityAndFlags;
 };
 
-class hkpEntityExtendedListeners
-{
+class hkpEntityExtendedListeners {
 public:
-	hkpEntitySmallArraySerializeOverrideType m_activationListeners;
-	hkpEntitySmallArraySerializeOverrideType m_entityListeners;
+  hkpEntitySmallArraySerializeOverrideType m_activationListeners;
+  hkpEntitySmallArraySerializeOverrideType m_entityListeners;
 };
 
-class hkpMaterial
-{
+class hkpMaterial {
 public:
-	int8 m_responseType;
-	hkHalf m_rollingFrictionMultiplier;
-	float m_friction;
-	float m_restitution;
+  int8 m_responseType;
+  hkHalf m_rollingFrictionMultiplier;
+  float m_friction;
+  float m_restitution;
 };
 
-class hkpModifierConstraintAtom : public hkpConstraintAtom
-{
+class hkpModifierConstraintAtom : public hkpConstraintAtom {
 public:
-	uint16 m_modifierAtomSize;
-	uint16 m_childSize;
-	hkpConstraintAtom *m_child;
-	uint32 m_pad;
+  uint16 m_modifierAtomSize;
+  uint16 m_childSize;
+  hkpConstraintAtom *m_child;
+  uint32 m_pad;
 };
 
-class hkpConstraintInstanceSmallArraySerializeOverrideType
-{
+class hkpConstraintInstanceSmallArraySerializeOverrideType {
 public:
-	void *m_data;
-	uint16 m_size;
-	uint16 m_capacityAndFlags;
+  void *m_data;
+  uint16 m_size;
+  uint16 m_capacityAndFlags;
 };
 
-class hkpConstraintInstance : public hkReferencedObject
-{
+class hkpConstraintInstance : public hkReferencedObject {
 public:
-	virtual ~hkpConstraintInstance();
-	void *m_owner;
-	hkpConstraintData *m_data;
-	hkpModifierConstraintAtom *m_constraintModifiers;
-	class hkpEntity *m_entities;
-	uint8 m_priority;
-	bool m_wantRuntime;
-	uint8 m_destructionRemapInfo;
-	hkpConstraintInstanceSmallArraySerializeOverrideType m_listeners;
-	hkStringPtr m_name;
-	uint64 m_userData;
-	void *m_internal;
-	uint32 m_uid;
+  virtual ~hkpConstraintInstance();
+  void *m_owner;
+  hkpConstraintData *m_data;
+  hkpModifierConstraintAtom *m_constraintModifiers;
+  class hkpEntity *m_entities;
+  uint8 m_priority;
+  bool m_wantRuntime;
+  uint8 m_destructionRemapInfo;
+  hkpConstraintInstanceSmallArraySerializeOverrideType m_listeners;
+  hkStringPtr m_name;
+  uint64 m_userData;
+  void *m_internal;
+  uint32 m_uid;
 };
 
-class hkpEntitySpuCollisionCallback
-{
+class hkpEntitySpuCollisionCallback {
 public:
-	void *m_util;
-	uint16 m_capacity;
-	uint8 m_eventFilter;
-	uint8 m_userFilter;
+  void *m_util;
+  uint16 m_capacity;
+  uint8 m_eventFilter;
+  uint8 m_userFilter;
 };
 
-class hkpEntity : public hkpWorldObject
-{
+class hkpEntity : public hkpWorldObject {
 public:
-	virtual ~hkpEntity();
-	hkpMaterial m_material;
-	void *m_limitContactImpulseUtilAndFlag;
-	float m_damageMultiplier;
-	void *m_breakableBody;
-	uint32 m_solverData;
-	uint16 m_storageIndex;
-	uint16 m_contactPointCallbackDelay;
-	hkpEntitySmallArraySerializeOverrideType m_constraintsMaster;
-	hkArray<hkpConstraintInstance *> m_constraintsSlave;
-	hkArray<uint8> m_constraintRuntime;
-	void *m_simulationIsland;
-	int8 m_autoRemoveLevel;
-	uint8 m_numShapeKeysInContactPointProperties;
-	uint8 m_responseModifierFlags;
-	uint32 m_uid;
-	hkpEntitySpuCollisionCallback m_spuCollisionCallback;
-	hkpMaxSizeMotion m_motion;
-	hkpEntitySmallArraySerializeOverrideType m_contactListeners;
-	hkpEntitySmallArraySerializeOverrideType m_actions;
-	hkLocalFrame *m_localFrame;
-	hkpEntityExtendedListeners *m_extendedListeners;
-	uint32 m_npData;
+  virtual ~hkpEntity();
+  hkpMaterial m_material;
+  void *m_limitContactImpulseUtilAndFlag;
+  float m_damageMultiplier;
+  void *m_breakableBody;
+  uint32 m_solverData;
+  uint16 m_storageIndex;
+  uint16 m_contactPointCallbackDelay;
+  hkpEntitySmallArraySerializeOverrideType m_constraintsMaster;
+  hkArray<hkpConstraintInstance *> m_constraintsSlave;
+  hkArray<uint8> m_constraintRuntime;
+  void *m_simulationIsland;
+  int8 m_autoRemoveLevel;
+  uint8 m_numShapeKeysInContactPointProperties;
+  uint8 m_responseModifierFlags;
+  uint32 m_uid;
+  hkpEntitySpuCollisionCallback m_spuCollisionCallback;
+  hkpMaxSizeMotion m_motion;
+  hkpEntitySmallArraySerializeOverrideType m_contactListeners;
+  hkpEntitySmallArraySerializeOverrideType m_actions;
+  hkLocalFrame *m_localFrame;
+  hkpEntityExtendedListeners *m_extendedListeners;
+  uint32 m_npData;
 };
 
-class hkpConstraintChainInstance : public hkpConstraintInstance
-{
+class hkpConstraintChainInstance : public hkpConstraintInstance {
 public:
-	virtual ~hkpConstraintChainInstance();
-	hkArray<hkpEntity *> m_chainedEntities;
-	hkpConstraintChainInstanceAction *m_action;
+  virtual ~hkpConstraintChainInstance();
+  hkArray<hkpEntity *> m_chainedEntities;
+  hkpConstraintChainInstanceAction *m_action;
 };
 
-class hkpPairCollisionFilterMapPairFilterKeyOverrideType
-{
+class hkpPairCollisionFilterMapPairFilterKeyOverrideType {
 public:
-	void *m_elem;
-	int32 m_numElems;
-	int32 m_hashMod;
+  void *m_elem;
+  int32 m_numElems;
+  int32 m_hashMod;
 };
 
-class hkpPairCollisionFilter : public hkpCollisionFilter
-{
+class hkpPairCollisionFilter : public hkpCollisionFilter {
 public:
-	virtual ~hkpPairCollisionFilter();
-	hkpPairCollisionFilterMapPairFilterKeyOverrideType m_disabledPairs;
-	hkpCollisionFilter *m_childFilter;
+  virtual ~hkpPairCollisionFilter();
+  hkpPairCollisionFilterMapPairFilterKeyOverrideType m_disabledPairs;
+  hkpCollisionFilter *m_childFilter;
 };
 
-class hkpConstraintCollisionFilter : public hkpPairCollisionFilter
-{
+class hkpConstraintCollisionFilter : public hkpPairCollisionFilter {
 public:
-	virtual ~hkpConstraintCollisionFilter();
+  virtual ~hkpConstraintCollisionFilter();
 };
 
-class hkWorldMemoryAvailableWatchDog : public hkReferencedObject
-{
+class hkWorldMemoryAvailableWatchDog : public hkReferencedObject {
 public:
 };
 
-class hkpDefaultWorldMemoryWatchDog : public hkWorldMemoryAvailableWatchDog
-{
+class hkpDefaultWorldMemoryWatchDog : public hkWorldMemoryAvailableWatchDog {
 public:
-	virtual ~hkpDefaultWorldMemoryWatchDog();
-	int32 m_freeHeapMemoryRequested;
+  virtual ~hkpDefaultWorldMemoryWatchDog();
+  int32 m_freeHeapMemoryRequested;
 };
 
-class hkpFixedRigidMotion : public hkpKeyframedRigidMotion
-{
+class hkpFixedRigidMotion : public hkpKeyframedRigidMotion {
 public:
-	virtual ~hkpFixedRigidMotion();
+  virtual ~hkpFixedRigidMotion();
 };
 
-class hkpGenericConstraintDataSchemeConstraintInfo
-{
+class hkpGenericConstraintDataSchemeConstraintInfo {
 public:
-	int32 m_maxSizeOfSchema;
-	int32 m_sizeOfSchemas;
-	int32 m_numSolverResults;
-	int32 m_numSolverElemTemps;
+  int32 m_maxSizeOfSchema;
+  int32 m_sizeOfSchemas;
+  int32 m_numSolverResults;
+  int32 m_numSolverElemTemps;
 };
 
-class hkpGenericConstraintDataScheme
-{
+class hkpGenericConstraintDataScheme {
 public:
-	hkpGenericConstraintDataSchemeConstraintInfo m_info;
-	hkArray<hkVector4> m_data;
-	hkArray<int32> m_commands;
-	hkArray<void *> m_modifiers;
-	hkArray<hkpConstraintMotor *> m_motors;
+  hkpGenericConstraintDataSchemeConstraintInfo m_info;
+  hkArray<hkVector4> m_data;
+  hkArray<int32> m_commands;
+  hkArray<void *> m_modifiers;
+  hkArray<hkpConstraintMotor *> m_motors;
 };
 
-class hkpGenericConstraintData : public hkpConstraintData
-{
+class hkpGenericConstraintData : public hkpConstraintData {
 public:
-	virtual ~hkpGenericConstraintData();
-	hkpBridgeAtoms m_atoms;
-	hkpGenericConstraintDataScheme m_scheme;
+  virtual ~hkpGenericConstraintData();
+  hkpBridgeAtoms m_atoms;
+  hkpGenericConstraintDataScheme m_scheme;
 };
 
-class hkp2dAngConstraintAtom : public hkpConstraintAtom
-{
+class hkp2dAngConstraintAtom : public hkpConstraintAtom {
 public:
-	uint8 m_freeRotationAxis;
+  uint8 m_freeRotationAxis;
 };
 
-class hkpHingeConstraintDataAtoms
-{
+class hkpHingeConstraintDataAtoms {
 public:
-	hkpSetLocalTransformsConstraintAtom m_transforms;
-	hkpSetupStabilizationAtom m_setupStabilization;
-	hkp2dAngConstraintAtom m_2dAng;
-	hkpBallSocketConstraintAtom m_ballSocket;
+  hkpSetLocalTransformsConstraintAtom m_transforms;
+  hkpSetupStabilizationAtom m_setupStabilization;
+  hkp2dAngConstraintAtom m_2dAng;
+  hkpBallSocketConstraintAtom m_ballSocket;
 };
 
-class hkpHingeConstraintData : public hkpConstraintData
-{
+class hkpHingeConstraintData : public hkpConstraintData {
 public:
-	virtual ~hkpHingeConstraintData();
-	hkpHingeConstraintDataAtoms m_atoms;
+  virtual ~hkpHingeConstraintData();
+  hkpHingeConstraintDataAtoms m_atoms;
 };
 
-class hkpAngLimitConstraintAtom : public hkpConstraintAtom
-{
+class hkpAngLimitConstraintAtom : public hkpConstraintAtom {
 public:
-	uint8 m_isEnabled;
-	uint8 m_limitAxis;
-	float m_minAngle;
-	float m_maxAngle;
-	float m_angularLimitsTauFactor;
+  uint8 m_isEnabled;
+  uint8 m_limitAxis;
+  float m_minAngle;
+  float m_maxAngle;
+  float m_angularLimitsTauFactor;
 };
 
-class hkpSetLocalRotationsConstraintAtom : public hkpConstraintAtom
-{
+class hkpSetLocalRotationsConstraintAtom : public hkpConstraintAtom {
 public:
-	hkRotation m_rotationA;
-	hkRotation m_rotationB;
+  hkRotation m_rotationA;
+  hkRotation m_rotationB;
 };
 
-class hkpHingeLimitsDataAtoms
-{
+class hkpHingeLimitsDataAtoms {
 public:
-	hkpSetLocalRotationsConstraintAtom m_rotations;
-	hkpAngLimitConstraintAtom m_angLimit;
-	hkp2dAngConstraintAtom m_2dAng;
+  hkpSetLocalRotationsConstraintAtom m_rotations;
+  hkpAngLimitConstraintAtom m_angLimit;
+  hkp2dAngConstraintAtom m_2dAng;
 };
 
-class hkpHingeLimitsData : public hkpConstraintData
-{
+class hkpHingeLimitsData : public hkpConstraintData {
 public:
-	virtual ~hkpHingeLimitsData();
-	hkpHingeLimitsDataAtoms m_atoms;
+  virtual ~hkpHingeLimitsData();
+  hkpHingeLimitsDataAtoms m_atoms;
 };
 
-class hkpAngMotorConstraintAtom : public hkpConstraintAtom
-{
+class hkpAngMotorConstraintAtom : public hkpConstraintAtom {
 public:
-	bool m_isEnabled;
-	uint8 m_motorAxis;
-	int16 m_initializedOffset;
-	int16 m_previousTargetAngleOffset;
-	int16 m_correspondingAngLimitSolverResultOffset;
-	float m_targetAngle;
-	hkpConstraintMotor *m_motor;
+  bool m_isEnabled;
+  uint8 m_motorAxis;
+  int16 m_initializedOffset;
+  int16 m_previousTargetAngleOffset;
+  int16 m_correspondingAngLimitSolverResultOffset;
+  float m_targetAngle;
+  hkpConstraintMotor *m_motor;
 };
 
-class hkpAngFrictionConstraintAtom : public hkpConstraintAtom
-{
+class hkpAngFrictionConstraintAtom : public hkpConstraintAtom {
 public:
-	uint8 m_isEnabled;
-	uint8 m_firstFrictionAxis;
-	uint8 m_numFrictionAxes;
-	float m_maxFrictionTorque;
+  uint8 m_isEnabled;
+  uint8 m_firstFrictionAxis;
+  uint8 m_numFrictionAxes;
+  float m_maxFrictionTorque;
 };
 
-class hkpLimitedHingeConstraintDataAtoms
-{
+class hkpLimitedHingeConstraintDataAtoms {
 public:
-	hkpSetLocalTransformsConstraintAtom m_transforms;
-	hkpSetupStabilizationAtom m_setupStabilization;
-	hkpAngMotorConstraintAtom m_angMotor;
-	hkpAngFrictionConstraintAtom m_angFriction;
-	hkpAngLimitConstraintAtom m_angLimit;
-	hkp2dAngConstraintAtom m_2dAng;
-	hkpBallSocketConstraintAtom m_ballSocket;
+  hkpSetLocalTransformsConstraintAtom m_transforms;
+  hkpSetupStabilizationAtom m_setupStabilization;
+  hkpAngMotorConstraintAtom m_angMotor;
+  hkpAngFrictionConstraintAtom m_angFriction;
+  hkpAngLimitConstraintAtom m_angLimit;
+  hkp2dAngConstraintAtom m_2dAng;
+  hkpBallSocketConstraintAtom m_ballSocket;
 };
 
-class hkpLimitedHingeConstraintData : public hkpConstraintData
-{
+class hkpLimitedHingeConstraintData : public hkpConstraintData {
 public:
-	virtual ~hkpLimitedHingeConstraintData();
-	hkpLimitedHingeConstraintDataAtoms m_atoms;
+  virtual ~hkpLimitedHingeConstraintData();
+  hkpLimitedHingeConstraintDataAtoms m_atoms;
 };
 
-class hkpParametricCurve : public hkReferencedObject
-{
+class hkpParametricCurve : public hkReferencedObject {
 public:
 };
 
-class hkpLinearParametricCurve : public hkpParametricCurve
-{
+class hkpLinearParametricCurve : public hkpParametricCurve {
 public:
-	virtual ~hkpLinearParametricCurve();
-	float m_smoothingFactor;
-	bool m_closedLoop;
-	hkVector4 m_dirNotParallelToTangentAlongWholePath;
-	hkArray<hkVector4> m_points;
-	hkArray<float> m_distance;
+  virtual ~hkpLinearParametricCurve();
+  float m_smoothingFactor;
+  bool m_closedLoop;
+  hkVector4 m_dirNotParallelToTangentAlongWholePath;
+  hkArray<hkVector4> m_points;
+  hkArray<float> m_distance;
 };
 
-class hkpMalleableConstraintData : public hkpConstraintData
-{
+class hkpMalleableConstraintData : public hkpConstraintData {
 public:
-	virtual ~hkpMalleableConstraintData();
-	hkpConstraintData *m_constraintData;
-	hkpBridgeAtoms m_atoms;
-	float m_strength;
+  virtual ~hkpMalleableConstraintData();
+  hkpConstraintData *m_constraintData;
+  hkpBridgeAtoms m_atoms;
+  float m_strength;
 };
 
-class hkpRigidBody : public hkpEntity
-{
+class hkpRigidBody : public hkpEntity {
 public:
-	virtual ~hkpRigidBody();
+  virtual ~hkpRigidBody();
 };
 
-class hkpPhysicsSystem : public hkReferencedObject
-{
+class hkpPhysicsSystem : public hkReferencedObject {
 public:
-	virtual ~hkpPhysicsSystem();
-	hkArray<hkpRigidBody *> m_rigidBodies;
-	hkArray<hkpConstraintInstance *> m_constraints;
-	hkArray<hkpAction *> m_actions;
-	hkArray<hkpPhantom *> m_phantoms;
-	hkStringPtr m_name;
-	uint64 m_userData;
-	bool m_active;
+  virtual ~hkpPhysicsSystem();
+  hkArray<hkpRigidBody *> m_rigidBodies;
+  hkArray<hkpConstraintInstance *> m_constraints;
+  hkArray<hkpAction *> m_actions;
+  hkArray<hkpPhantom *> m_phantoms;
+  hkStringPtr m_name;
+  uint64 m_userData;
+  bool m_active;
 };
 
-class hkpPointToPathConstraintData : public hkpConstraintData
-{
+class hkpPointToPathConstraintData : public hkpConstraintData {
 public:
-	virtual ~hkpPointToPathConstraintData();
-	hkpBridgeAtoms m_atoms;
-	hkpParametricCurve *m_path;
-	float m_maxFrictionForce;
-	int8 m_angularConstrainedDOF;
-	hkTransform m_transform_OS_KS;
+  virtual ~hkpPointToPathConstraintData();
+  hkpBridgeAtoms m_atoms;
+  hkpParametricCurve *m_path;
+  float m_maxFrictionForce;
+  int8 m_angularConstrainedDOF;
+  hkTransform m_transform_OS_KS;
 };
 
-class hkpLinConstraintAtom : public hkpConstraintAtom
-{
+class hkpLinConstraintAtom : public hkpConstraintAtom {
 public:
-	uint8 m_axisIndex;
+  uint8 m_axisIndex;
 };
 
-class hkpPointToPlaneConstraintDataAtoms
-{
+class hkpPointToPlaneConstraintDataAtoms {
 public:
-	hkpSetLocalTransformsConstraintAtom m_transforms;
-	hkpLinConstraintAtom m_lin;
+  hkpSetLocalTransformsConstraintAtom m_transforms;
+  hkpLinConstraintAtom m_lin;
 };
 
-class hkpPointToPlaneConstraintData : public hkpConstraintData
-{
+class hkpPointToPlaneConstraintData : public hkpConstraintData {
 public:
-	virtual ~hkpPointToPlaneConstraintData();
-	hkpPointToPlaneConstraintDataAtoms m_atoms;
+  virtual ~hkpPointToPlaneConstraintData();
+  hkpPointToPlaneConstraintDataAtoms m_atoms;
 };
 
-class hkpPositionConstraintMotor : public hkpLimitedForceConstraintMotor
-{
+class hkpPositionConstraintMotor : public hkpLimitedForceConstraintMotor {
 public:
-	virtual ~hkpPositionConstraintMotor();
-	float m_tau;
-	float m_damping;
-	float m_proportionalRecoveryVelocity;
-	float m_constantRecoveryVelocity;
+  virtual ~hkpPositionConstraintMotor();
+  float m_tau;
+  float m_damping;
+  float m_proportionalRecoveryVelocity;
+  float m_constantRecoveryVelocity;
 };
 
-class hkpLinLimitConstraintAtom : public hkpConstraintAtom
-{
+class hkpLinLimitConstraintAtom : public hkpConstraintAtom {
 public:
-	uint8 m_axisIndex;
-	float m_min;
-	float m_max;
+  uint8 m_axisIndex;
+  float m_min;
+  float m_max;
 };
 
-class hkpAngConstraintAtom : public hkpConstraintAtom
-{
+class hkpAngConstraintAtom : public hkpConstraintAtom {
 public:
-	uint8 m_firstConstrainedAxis;
-	uint8 m_numConstrainedAxes;
+  uint8 m_firstConstrainedAxis;
+  uint8 m_numConstrainedAxes;
 };
 
-class hkpLinFrictionConstraintAtom : public hkpConstraintAtom
-{
+class hkpLinFrictionConstraintAtom : public hkpConstraintAtom {
 public:
-	uint8 m_isEnabled;
-	uint8 m_frictionAxis;
-	float m_maxFrictionForce;
+  uint8 m_isEnabled;
+  uint8 m_frictionAxis;
+  float m_maxFrictionForce;
 };
 
-class hkpLinMotorConstraintAtom : public hkpConstraintAtom
-{
+class hkpLinMotorConstraintAtom : public hkpConstraintAtom {
 public:
-	bool m_isEnabled;
-	uint8 m_motorAxis;
-	int16 m_initializedOffset;
-	int16 m_previousTargetPositionOffset;
-	float m_targetPosition;
-	hkpConstraintMotor *m_motor;
+  bool m_isEnabled;
+  uint8 m_motorAxis;
+  int16 m_initializedOffset;
+  int16 m_previousTargetPositionOffset;
+  float m_targetPosition;
+  hkpConstraintMotor *m_motor;
 };
 
-class hkpPrismaticConstraintDataAtoms
-{
+class hkpPrismaticConstraintDataAtoms {
 public:
-	hkpSetLocalTransformsConstraintAtom m_transforms;
-	hkpLinMotorConstraintAtom m_motor;
-	hkpLinFrictionConstraintAtom m_friction;
-	hkpAngConstraintAtom m_ang;
-	hkpLinConstraintAtom m_lin0;
-	hkpLinConstraintAtom m_lin1;
-	hkpLinLimitConstraintAtom m_linLimit;
+  hkpSetLocalTransformsConstraintAtom m_transforms;
+  hkpLinMotorConstraintAtom m_motor;
+  hkpLinFrictionConstraintAtom m_friction;
+  hkpAngConstraintAtom m_ang;
+  hkpLinConstraintAtom m_lin0;
+  hkpLinConstraintAtom m_lin1;
+  hkpLinLimitConstraintAtom m_linLimit;
 };
 
-class hkpPrismaticConstraintData : public hkpConstraintData
-{
+class hkpPrismaticConstraintData : public hkpConstraintData {
 public:
-	virtual ~hkpPrismaticConstraintData();
-	hkpPrismaticConstraintDataAtoms m_atoms;
+  virtual ~hkpPrismaticConstraintData();
+  hkpPrismaticConstraintDataAtoms m_atoms;
 };
 
-class hkpPulleyConstraintAtom : public hkpConstraintAtom
-{
+class hkpPulleyConstraintAtom : public hkpConstraintAtom {
 public:
-	hkVector4 m_fixedPivotAinWorld;
-	hkVector4 m_fixedPivotBinWorld;
-	float m_ropeLength;
-	float m_leverageOnBodyB;
+  hkVector4 m_fixedPivotAinWorld;
+  hkVector4 m_fixedPivotBinWorld;
+  float m_ropeLength;
+  float m_leverageOnBodyB;
 };
 
-class hkpPulleyConstraintDataAtoms
-{
+class hkpPulleyConstraintDataAtoms {
 public:
-	hkpSetLocalTranslationsConstraintAtom m_translations;
-	hkpPulleyConstraintAtom m_pulley;
+  hkpSetLocalTranslationsConstraintAtom m_translations;
+  hkpPulleyConstraintAtom m_pulley;
 };
 
-class hkpPulleyConstraintData : public hkpConstraintData
-{
+class hkpPulleyConstraintData : public hkpConstraintData {
 public:
-	virtual ~hkpPulleyConstraintData();
-	hkpPulleyConstraintDataAtoms m_atoms;
+  virtual ~hkpPulleyConstraintData();
+  hkpPulleyConstraintDataAtoms m_atoms;
 };
 
-class hkpRackAndPinionConstraintAtom : public hkpConstraintAtom
-{
+class hkpRackAndPinionConstraintAtom : public hkpConstraintAtom {
 public:
-	float m_pinionRadiusOrScrewPitch;
-	bool m_isScrew;
-	int8 m_memOffsetToInitialAngleOffset;
-	int8 m_memOffsetToPrevAngle;
-	int8 m_memOffsetToRevolutionCounter;
+  float m_pinionRadiusOrScrewPitch;
+  bool m_isScrew;
+  int8 m_memOffsetToInitialAngleOffset;
+  int8 m_memOffsetToPrevAngle;
+  int8 m_memOffsetToRevolutionCounter;
 };
 
-class hkpRackAndPinionConstraintDataAtoms
-{
+class hkpRackAndPinionConstraintDataAtoms {
 public:
-	hkpSetLocalTransformsConstraintAtom m_transforms;
-	hkpRackAndPinionConstraintAtom m_rackAndPinion;
+  hkpSetLocalTransformsConstraintAtom m_transforms;
+  hkpRackAndPinionConstraintAtom m_rackAndPinion;
 };
 
-class hkpRackAndPinionConstraintData : public hkpConstraintData
-{
+class hkpRackAndPinionConstraintData : public hkpConstraintData {
 public:
-	virtual ~hkpRackAndPinionConstraintData();
-	hkpRackAndPinionConstraintDataAtoms m_atoms;
+  virtual ~hkpRackAndPinionConstraintData();
+  hkpRackAndPinionConstraintDataAtoms m_atoms;
 };
 
-class hkpRagdollMotorConstraintAtom : public hkpConstraintAtom
-{
+class hkpRagdollMotorConstraintAtom : public hkpConstraintAtom {
 public:
-	bool m_isEnabled;
-	int16 m_initializedOffset;
-	int16 m_previousTargetAnglesOffset;
-	hkMatrix3 m_target_bRca;
-	hkpConstraintMotor *m_motors;
+  bool m_isEnabled;
+  int16 m_initializedOffset;
+  int16 m_previousTargetAnglesOffset;
+  hkMatrix3 m_target_bRca;
+  hkpConstraintMotor *m_motors;
 };
 
-class hkpTwistLimitConstraintAtom : public hkpConstraintAtom
-{
+class hkpTwistLimitConstraintAtom : public hkpConstraintAtom {
 public:
-	uint8 m_isEnabled;
-	uint8 m_twistAxis;
-	uint8 m_refAxis;
-	float m_minAngle;
-	float m_maxAngle;
-	float m_angularLimitsTauFactor;
+  uint8 m_isEnabled;
+  uint8 m_twistAxis;
+  uint8 m_refAxis;
+  float m_minAngle;
+  float m_maxAngle;
+  float m_angularLimitsTauFactor;
 };
 
-class hkpConeLimitConstraintAtom : public hkpConstraintAtom
-{
+class hkpConeLimitConstraintAtom : public hkpConstraintAtom {
 public:
-	uint8 m_isEnabled;
-	uint8 m_twistAxisInA;
-	uint8 m_refAxisInB;
-	uint8 m_angleMeasurementMode;
-	uint8 m_memOffsetToAngleOffset;
-	float m_minAngle;
-	float m_maxAngle;
-	float m_angularLimitsTauFactor;
+  uint8 m_isEnabled;
+  uint8 m_twistAxisInA;
+  uint8 m_refAxisInB;
+  uint8 m_angleMeasurementMode;
+  uint8 m_memOffsetToAngleOffset;
+  float m_minAngle;
+  float m_maxAngle;
+  float m_angularLimitsTauFactor;
 };
 
-class hkpRagdollConstraintDataAtoms
-{
+class hkpRagdollConstraintDataAtoms {
 public:
-	hkpSetLocalTransformsConstraintAtom m_transforms;
-	hkpSetupStabilizationAtom m_setupStabilization;
-	hkpRagdollMotorConstraintAtom m_ragdollMotors;
-	hkpAngFrictionConstraintAtom m_angFriction;
-	hkpTwistLimitConstraintAtom m_twistLimit;
-	hkpConeLimitConstraintAtom m_coneLimit;
-	hkpConeLimitConstraintAtom m_planesLimit;
-	hkpBallSocketConstraintAtom m_ballSocket;
+  hkpSetLocalTransformsConstraintAtom m_transforms;
+  hkpSetupStabilizationAtom m_setupStabilization;
+  hkpRagdollMotorConstraintAtom m_ragdollMotors;
+  hkpAngFrictionConstraintAtom m_angFriction;
+  hkpTwistLimitConstraintAtom m_twistLimit;
+  hkpConeLimitConstraintAtom m_coneLimit;
+  hkpConeLimitConstraintAtom m_planesLimit;
+  hkpBallSocketConstraintAtom m_ballSocket;
 };
 
-class hkpRagdollConstraintData : public hkpConstraintData
-{
+class hkpRagdollConstraintData : public hkpConstraintData {
 public:
-	virtual ~hkpRagdollConstraintData();
-	hkpRagdollConstraintDataAtoms m_atoms;
+  virtual ~hkpRagdollConstraintData();
+  hkpRagdollConstraintDataAtoms m_atoms;
 };
 
-class hkpRagdollLimitsDataAtoms
-{
+class hkpRagdollLimitsDataAtoms {
 public:
-	hkpSetLocalRotationsConstraintAtom m_rotations;
-	hkpTwistLimitConstraintAtom m_twistLimit;
-	hkpConeLimitConstraintAtom m_coneLimit;
-	hkpConeLimitConstraintAtom m_planesLimit;
+  hkpSetLocalRotationsConstraintAtom m_rotations;
+  hkpTwistLimitConstraintAtom m_twistLimit;
+  hkpConeLimitConstraintAtom m_coneLimit;
+  hkpConeLimitConstraintAtom m_planesLimit;
 };
 
-class hkpRagdollLimitsData : public hkpConstraintData
-{
+class hkpRagdollLimitsData : public hkpConstraintData {
 public:
-	virtual ~hkpRagdollLimitsData();
-	hkpRagdollLimitsDataAtoms m_atoms;
+  virtual ~hkpRagdollLimitsData();
+  hkpRagdollLimitsDataAtoms m_atoms;
 };
 
-class hkpRotationalConstraintDataAtoms
-{
+class hkpRotationalConstraintDataAtoms {
 public:
-	hkpSetLocalRotationsConstraintAtom m_rotations;
-	hkpAngConstraintAtom m_ang;
+  hkpSetLocalRotationsConstraintAtom m_rotations;
+  hkpAngConstraintAtom m_ang;
 };
 
-class hkpRotationalConstraintData : public hkpConstraintData
-{
+class hkpRotationalConstraintData : public hkpConstraintData {
 public:
-	virtual ~hkpRotationalConstraintData();
-	hkpRotationalConstraintDataAtoms m_atoms;
+  virtual ~hkpRotationalConstraintData();
+  hkpRotationalConstraintDataAtoms m_atoms;
 };
 
-class hkpSimpleShapePhantomCollisionDetail
-{
+class hkpSimpleShapePhantomCollisionDetail {
 public:
-	hkpCollidable *m_collidable;
+  hkpCollidable *m_collidable;
 };
 
-class hkpSimpleShapePhantom : public hkpShapePhantom
-{
+class hkpSimpleShapePhantom : public hkpShapePhantom {
 public:
-	virtual ~hkpSimpleShapePhantom();
-	hkArray<hkpSimpleShapePhantomCollisionDetail> m_collisionDetails;
-	bool m_orderDirty;
+  virtual ~hkpSimpleShapePhantom();
+  hkArray<hkpSimpleShapePhantomCollisionDetail> m_collisionDetails;
+  bool m_orderDirty;
 };
 
-class hkpWorld : public hkReferencedObject
-{
+class hkpWorld : public hkReferencedObject {
 public:
-	virtual ~hkpWorld();
-	class hkpSimulation *m_simulation;
-	hkVector4 m_gravity;
-	void *m_fixedIsland;
-	hkpRigidBody *m_fixedRigidBody;
-	hkArray<void *> m_activeSimulationIslands;
-	hkArray<void *> m_inactiveSimulationIslands;
-	hkArray<void *> m_dirtySimulationIslands;
-	void *m_maintenanceMgr;
-	void *m_memoryWatchDog;
-	bool m_assertOnRunningOutOfSolverMemory;
-	void *m_broadPhase;
-	void *m_kdTreeManager;
-	bool m_autoUpdateTree;
-	void *m_broadPhaseDispatcher;
-	void *m_phantomBroadPhaseListener;
-	void *m_entityEntityBroadPhaseListener;
-	void *m_broadPhaseBorderListener;
-	void *m_multithreadedSimulationJobData;
-	void *m_collisionInput;
-	void *m_collisionFilter;
-	void *m_collisionDispatcher;
-	void *m_convexListFilter;
-	void *m_pendingOperations;
-	int32 m_pendingOperationsCount;
-	int32 m_pendingBodyOperationsCount;
-	int32 m_criticalOperationsLockCount;
-	int32 m_criticalOperationsLockCountForPhantoms;
-	bool m_blockExecutingPendingOperations;
-	bool m_criticalOperationsAllowed;
-	void *m_pendingOperationQueues;
-	int32 m_pendingOperationQueueCount;
-	hkMultiThreadCheck m_multiThreadCheck;
-	bool m_processActionsInSingleThread;
-	bool m_allowIntegrationOfIslandsWithoutConstraintsInASeparateJob;
-	uint32 m_minDesiredIslandSize;
-	void *m_modifyConstraintCriticalSection;
-	int32 m_isLocked;
-	void *m_islandDirtyListCriticalSection;
-	void *m_propertyMasterLock;
-	bool m_wantSimulationIslands;
-	bool m_useHybridBroadphase;
-	float m_snapCollisionToConvexEdgeThreshold;
-	float m_snapCollisionToConcaveEdgeThreshold;
-	bool m_enableToiWeldRejection;
-	bool m_wantDeactivation;
-	bool m_shouldActivateOnRigidBodyTransformChange;
-	float m_deactivationReferenceDistance;
-	float m_toiCollisionResponseRotateNormal;
-	int32 m_maxSectorsPerMidphaseCollideTask;
-	int32 m_maxSectorsPerNarrowphaseCollideTask;
-	bool m_processToisMultithreaded;
-	int32 m_maxEntriesPerToiMidphaseCollideTask;
-	int32 m_maxEntriesPerToiNarrowphaseCollideTask;
-	int32 m_maxNumToiCollisionPairsSinglethreaded;
-	int32 m_simulationType;
-	float m_numToisTillAllowedPenetrationSimplifiedToi;
-	float m_numToisTillAllowedPenetrationToi;
-	float m_numToisTillAllowedPenetrationToiHigher;
-	float m_numToisTillAllowedPenetrationToiForced;
-	uint32 m_lastEntityUid;
-	uint32 m_lastIslandUid;
-	uint32 m_lastConstraintUid;
-	hkArray<hkpPhantom *> m_phantoms;
-	hkArray<void *> m_actionListeners;
-	hkArray<void *> m_entityListeners;
-	hkArray<void *> m_phantomListeners;
-	hkArray<void *> m_constraintListeners;
-	hkArray<void *> m_worldDeletionListeners;
-	hkArray<void *> m_islandActivationListeners;
-	hkArray<void *> m_worldPostSimulationListeners;
-	hkArray<void *> m_worldPostIntegrateListeners;
-	hkArray<void *> m_worldPostCollideListeners;
-	hkArray<void *> m_islandPostIntegrateListeners;
-	hkArray<void *> m_islandPostCollideListeners;
-	hkArray<void *> m_contactListeners;
-	hkArray<void *> m_contactImpulseLimitBreachedListeners;
-	hkArray<void *> m_worldExtensions;
-	void *m_violatedConstraintArray;
-	void *m_broadPhaseBorder;
-	void *m_destructionWorld;
-	void *m_npWorld;
-	hkVector4 m_broadPhaseExtents;
-	int32 m_broadPhaseNumMarkers;
-	int32 m_sizeOfToiEventQueue;
-	int32 m_broadPhaseQuerySize;
-	int32 m_broadPhaseUpdateSize;
-	int8 m_contactPointGeneration;
+  virtual ~hkpWorld();
+  class hkpSimulation *m_simulation;
+  hkVector4 m_gravity;
+  void *m_fixedIsland;
+  hkpRigidBody *m_fixedRigidBody;
+  hkArray<void *> m_activeSimulationIslands;
+  hkArray<void *> m_inactiveSimulationIslands;
+  hkArray<void *> m_dirtySimulationIslands;
+  void *m_maintenanceMgr;
+  void *m_memoryWatchDog;
+  bool m_assertOnRunningOutOfSolverMemory;
+  void *m_broadPhase;
+  void *m_kdTreeManager;
+  bool m_autoUpdateTree;
+  void *m_broadPhaseDispatcher;
+  void *m_phantomBroadPhaseListener;
+  void *m_entityEntityBroadPhaseListener;
+  void *m_broadPhaseBorderListener;
+  void *m_multithreadedSimulationJobData;
+  void *m_collisionInput;
+  void *m_collisionFilter;
+  void *m_collisionDispatcher;
+  void *m_convexListFilter;
+  void *m_pendingOperations;
+  int32 m_pendingOperationsCount;
+  int32 m_pendingBodyOperationsCount;
+  int32 m_criticalOperationsLockCount;
+  int32 m_criticalOperationsLockCountForPhantoms;
+  bool m_blockExecutingPendingOperations;
+  bool m_criticalOperationsAllowed;
+  void *m_pendingOperationQueues;
+  int32 m_pendingOperationQueueCount;
+  hkMultiThreadCheck m_multiThreadCheck;
+  bool m_processActionsInSingleThread;
+  bool m_allowIntegrationOfIslandsWithoutConstraintsInASeparateJob;
+  uint32 m_minDesiredIslandSize;
+  void *m_modifyConstraintCriticalSection;
+  int32 m_isLocked;
+  void *m_islandDirtyListCriticalSection;
+  void *m_propertyMasterLock;
+  bool m_wantSimulationIslands;
+  bool m_useHybridBroadphase;
+  float m_snapCollisionToConvexEdgeThreshold;
+  float m_snapCollisionToConcaveEdgeThreshold;
+  bool m_enableToiWeldRejection;
+  bool m_wantDeactivation;
+  bool m_shouldActivateOnRigidBodyTransformChange;
+  float m_deactivationReferenceDistance;
+  float m_toiCollisionResponseRotateNormal;
+  int32 m_maxSectorsPerMidphaseCollideTask;
+  int32 m_maxSectorsPerNarrowphaseCollideTask;
+  bool m_processToisMultithreaded;
+  int32 m_maxEntriesPerToiMidphaseCollideTask;
+  int32 m_maxEntriesPerToiNarrowphaseCollideTask;
+  int32 m_maxNumToiCollisionPairsSinglethreaded;
+  int32 m_simulationType;
+  float m_numToisTillAllowedPenetrationSimplifiedToi;
+  float m_numToisTillAllowedPenetrationToi;
+  float m_numToisTillAllowedPenetrationToiHigher;
+  float m_numToisTillAllowedPenetrationToiForced;
+  uint32 m_lastEntityUid;
+  uint32 m_lastIslandUid;
+  uint32 m_lastConstraintUid;
+  hkArray<hkpPhantom *> m_phantoms;
+  hkArray<void *> m_actionListeners;
+  hkArray<void *> m_entityListeners;
+  hkArray<void *> m_phantomListeners;
+  hkArray<void *> m_constraintListeners;
+  hkArray<void *> m_worldDeletionListeners;
+  hkArray<void *> m_islandActivationListeners;
+  hkArray<void *> m_worldPostSimulationListeners;
+  hkArray<void *> m_worldPostIntegrateListeners;
+  hkArray<void *> m_worldPostCollideListeners;
+  hkArray<void *> m_islandPostIntegrateListeners;
+  hkArray<void *> m_islandPostCollideListeners;
+  hkArray<void *> m_contactListeners;
+  hkArray<void *> m_contactImpulseLimitBreachedListeners;
+  hkArray<void *> m_worldExtensions;
+  void *m_violatedConstraintArray;
+  void *m_broadPhaseBorder;
+  void *m_destructionWorld;
+  void *m_npWorld;
+  hkVector4 m_broadPhaseExtents;
+  int32 m_broadPhaseNumMarkers;
+  int32 m_sizeOfToiEventQueue;
+  int32 m_broadPhaseQuerySize;
+  int32 m_broadPhaseUpdateSize;
+  int8 m_contactPointGeneration;
 };
 
-class hkpSimulation : public hkReferencedObject
-{
+class hkpSimulation : public hkReferencedObject {
 public:
-	virtual ~hkpSimulation();
-	uint32 m_determinismCheckFrameCounter;
-	hkpWorld *m_world;
-	uint8 m_lastProcessingStep;
-	float m_currentTime;
-	float m_currentPsiTime;
-	float m_physicsDeltaTime;
-	float m_simulateUntilTime;
-	float m_frameMarkerPsiSnap;
-	uint32 m_previousStepResult;
+  virtual ~hkpSimulation();
+  uint32 m_determinismCheckFrameCounter;
+  hkpWorld *m_world;
+  uint8 m_lastProcessingStep;
+  float m_currentTime;
+  float m_currentPsiTime;
+  float m_physicsDeltaTime;
+  float m_simulateUntilTime;
+  float m_frameMarkerPsiSnap;
+  uint32 m_previousStepResult;
 };
 
-class hkpSphereMotion : public hkpMotion
-{
+class hkpSphereMotion : public hkpMotion {
 public:
-	virtual ~hkpSphereMotion();
+  virtual ~hkpSphereMotion();
 };
 
-class hkpSpringDamperConstraintMotor : public hkpLimitedForceConstraintMotor
-{
+class hkpSpringDamperConstraintMotor : public hkpLimitedForceConstraintMotor {
 public:
-	virtual ~hkpSpringDamperConstraintMotor();
-	float m_springConstant;
-	float m_springDamping;
+  virtual ~hkpSpringDamperConstraintMotor();
+  float m_springConstant;
+  float m_springDamping;
 };
 
-class hkpStiffSpringChainDataConstraintInfo
-{
+class hkpStiffSpringChainDataConstraintInfo {
 public:
-	hkVector4 m_pivotInA;
-	hkVector4 m_pivotInB;
-	float m_springLength;
+  hkVector4 m_pivotInA;
+  hkVector4 m_pivotInB;
+  float m_springLength;
 };
 
-class hkpStiffSpringChainData : public hkpConstraintChainData
-{
+class hkpStiffSpringChainData : public hkpConstraintChainData {
 public:
-	virtual ~hkpStiffSpringChainData();
-	hkpBridgeAtoms m_atoms;
-	hkArray<hkpStiffSpringChainDataConstraintInfo> m_infos;
-	float m_tau;
-	float m_damping;
-	float m_cfm;
+  virtual ~hkpStiffSpringChainData();
+  hkpBridgeAtoms m_atoms;
+  hkArray<hkpStiffSpringChainDataConstraintInfo> m_infos;
+  float m_tau;
+  float m_damping;
+  float m_cfm;
 };
 
-class hkpStiffSpringConstraintAtom : public hkpConstraintAtom
-{
+class hkpStiffSpringConstraintAtom : public hkpConstraintAtom {
 public:
-	float m_length;
+  float m_length;
 };
 
-class hkpStiffSpringConstraintDataAtoms
-{
+class hkpStiffSpringConstraintDataAtoms {
 public:
-	hkpSetLocalTranslationsConstraintAtom m_pivots;
-	hkpStiffSpringConstraintAtom m_spring;
+  hkpSetLocalTranslationsConstraintAtom m_pivots;
+  hkpStiffSpringConstraintAtom m_spring;
 };
 
-class hkpStiffSpringConstraintData : public hkpConstraintData
-{
+class hkpStiffSpringConstraintData : public hkpConstraintData {
 public:
-	virtual ~hkpStiffSpringConstraintData();
-	hkpStiffSpringConstraintDataAtoms m_atoms;
+  virtual ~hkpStiffSpringConstraintData();
+  hkpStiffSpringConstraintDataAtoms m_atoms;
 };
 
-class hkpThinBoxMotion : public hkpBoxMotion
-{
+class hkpThinBoxMotion : public hkpBoxMotion {
 public:
-	virtual ~hkpThinBoxMotion();
+  virtual ~hkpThinBoxMotion();
 };
 
-class hkpVelocityConstraintMotor : public hkpLimitedForceConstraintMotor
-{
+class hkpVelocityConstraintMotor : public hkpLimitedForceConstraintMotor {
 public:
-	virtual ~hkpVelocityConstraintMotor();
-	float m_tau;
-	float m_velocityTarget;
-	bool m_useVelocityTargetFromConstraintTargets;
+  virtual ~hkpVelocityConstraintMotor();
+  float m_tau;
+  float m_velocityTarget;
+  bool m_useVelocityTargetFromConstraintTargets;
 };
 
-class hkpLinSoftConstraintAtom : public hkpConstraintAtom
-{
+class hkpLinSoftConstraintAtom : public hkpConstraintAtom {
 public:
-	uint8 m_axisIndex;
-	float m_tau;
-	float m_damping;
+  uint8 m_axisIndex;
+  float m_tau;
+  float m_damping;
 };
 
-class hkpWheelConstraintDataAtoms
-{
+class hkpWheelConstraintDataAtoms {
 public:
-	hkpSetLocalTransformsConstraintAtom m_suspensionBase;
-	hkpLinLimitConstraintAtom m_lin0Limit;
-	hkpLinSoftConstraintAtom m_lin0Soft;
-	hkpLinConstraintAtom m_lin1;
-	hkpLinConstraintAtom m_lin2;
-	hkpSetLocalRotationsConstraintAtom m_steeringBase;
-	hkp2dAngConstraintAtom m_2dAng;
+  hkpSetLocalTransformsConstraintAtom m_suspensionBase;
+  hkpLinLimitConstraintAtom m_lin0Limit;
+  hkpLinSoftConstraintAtom m_lin0Soft;
+  hkpLinConstraintAtom m_lin1;
+  hkpLinConstraintAtom m_lin2;
+  hkpSetLocalRotationsConstraintAtom m_steeringBase;
+  hkp2dAngConstraintAtom m_2dAng;
 };
 
-class hkpWheelConstraintData : public hkpConstraintData
-{
+class hkpWheelConstraintData : public hkpConstraintData {
 public:
-	virtual ~hkpWheelConstraintData();
-	hkpWheelConstraintDataAtoms m_atoms;
-	hkVector4 m_initialAxleInB;
-	hkVector4 m_initialSteeringAxisInB;
+  virtual ~hkpWheelConstraintData();
+  hkpWheelConstraintDataAtoms m_atoms;
+  hkVector4 m_initialAxleInB;
+  hkVector4 m_initialSteeringAxisInB;
 };
 
-class hkpWorldCinfo : public hkReferencedObject
-{
+class hkpWorldCinfo : public hkReferencedObject {
 public:
-	virtual ~hkpWorldCinfo();
-	hkVector4 m_gravity;
-	int32 m_broadPhaseQuerySize;
-	float m_contactRestingVelocity;
-	int8 m_broadPhaseBorderBehaviour;
-	bool m_mtPostponeAndSortBroadPhaseBorderCallbacks;
-	hkAabb m_broadPhaseWorldAabb;
-	bool m_useKdTree;
-	bool m_useMultipleTree;
-	int8 m_treeUpdateType;
-	bool m_autoUpdateKdTree;
-	float m_collisionTolerance;
-	hkpCollisionFilter *m_collisionFilter;
-	hkpConvexListFilter *m_convexListFilter;
-	float m_expectedMaxLinearVelocity;
-	int32 m_sizeOfToiEventQueue;
-	float m_expectedMinPsiDeltaTime;
-	hkWorldMemoryAvailableWatchDog *m_memoryWatchDog;
-	int32 m_broadPhaseNumMarkers;
-	int8 m_contactPointGeneration;
-	bool m_allowToSkipConfirmedCallbacks;
-	bool m_useHybridBroadphase;
-	float m_solverTau;
-	float m_solverDamp;
-	int32 m_solverIterations;
-	int32 m_solverMicrosteps;
-	float m_maxConstraintViolation;
-	bool m_forceCoherentConstraintOrderingInSolver;
-	float m_snapCollisionToConvexEdgeThreshold;
-	float m_snapCollisionToConcaveEdgeThreshold;
-	bool m_enableToiWeldRejection;
-	bool m_enableDeprecatedWelding;
-	float m_iterativeLinearCastEarlyOutDistance;
-	int32 m_iterativeLinearCastMaxIterations;
-	uint8 m_deactivationNumInactiveFramesSelectFlag0;
-	uint8 m_deactivationNumInactiveFramesSelectFlag1;
-	uint8 m_deactivationIntegrateCounter;
-	bool m_shouldActivateOnRigidBodyTransformChange;
-	float m_deactivationReferenceDistance;
-	float m_toiCollisionResponseRotateNormal;
-	int32 m_maxSectorsPerMidphaseCollideTask;
-	int32 m_maxSectorsPerNarrowphaseCollideTask;
-	bool m_processToisMultithreaded;
-	int32 m_maxEntriesPerToiMidphaseCollideTask;
-	int32 m_maxEntriesPerToiNarrowphaseCollideTask;
-	int32 m_maxNumToiCollisionPairsSinglethreaded;
-	float m_numToisTillAllowedPenetrationSimplifiedToi;
-	float m_numToisTillAllowedPenetrationToi;
-	float m_numToisTillAllowedPenetrationToiHigher;
-	float m_numToisTillAllowedPenetrationToiForced;
-	bool m_enableDeactivation;
-	int8 m_simulationType;
-	bool m_enableSimulationIslands;
-	uint32 m_minDesiredIslandSize;
-	bool m_processActionsInSingleThread;
-	bool m_allowIntegrationOfIslandsWithoutConstraintsInASeparateJob;
-	float m_frameMarkerPsiSnap;
-	bool m_fireCollisionCallbacks;
+  virtual ~hkpWorldCinfo();
+  hkVector4 m_gravity;
+  int32 m_broadPhaseQuerySize;
+  float m_contactRestingVelocity;
+  int8 m_broadPhaseBorderBehaviour;
+  bool m_mtPostponeAndSortBroadPhaseBorderCallbacks;
+  hkAabb m_broadPhaseWorldAabb;
+  bool m_useKdTree;
+  bool m_useMultipleTree;
+  int8 m_treeUpdateType;
+  bool m_autoUpdateKdTree;
+  float m_collisionTolerance;
+  hkpCollisionFilter *m_collisionFilter;
+  hkpConvexListFilter *m_convexListFilter;
+  float m_expectedMaxLinearVelocity;
+  int32 m_sizeOfToiEventQueue;
+  float m_expectedMinPsiDeltaTime;
+  hkWorldMemoryAvailableWatchDog *m_memoryWatchDog;
+  int32 m_broadPhaseNumMarkers;
+  int8 m_contactPointGeneration;
+  bool m_allowToSkipConfirmedCallbacks;
+  bool m_useHybridBroadphase;
+  float m_solverTau;
+  float m_solverDamp;
+  int32 m_solverIterations;
+  int32 m_solverMicrosteps;
+  float m_maxConstraintViolation;
+  bool m_forceCoherentConstraintOrderingInSolver;
+  float m_snapCollisionToConvexEdgeThreshold;
+  float m_snapCollisionToConcaveEdgeThreshold;
+  bool m_enableToiWeldRejection;
+  bool m_enableDeprecatedWelding;
+  float m_iterativeLinearCastEarlyOutDistance;
+  int32 m_iterativeLinearCastMaxIterations;
+  uint8 m_deactivationNumInactiveFramesSelectFlag0;
+  uint8 m_deactivationNumInactiveFramesSelectFlag1;
+  uint8 m_deactivationIntegrateCounter;
+  bool m_shouldActivateOnRigidBodyTransformChange;
+  float m_deactivationReferenceDistance;
+  float m_toiCollisionResponseRotateNormal;
+  int32 m_maxSectorsPerMidphaseCollideTask;
+  int32 m_maxSectorsPerNarrowphaseCollideTask;
+  bool m_processToisMultithreaded;
+  int32 m_maxEntriesPerToiMidphaseCollideTask;
+  int32 m_maxEntriesPerToiNarrowphaseCollideTask;
+  int32 m_maxNumToiCollisionPairsSinglethreaded;
+  float m_numToisTillAllowedPenetrationSimplifiedToi;
+  float m_numToisTillAllowedPenetrationToi;
+  float m_numToisTillAllowedPenetrationToiHigher;
+  float m_numToisTillAllowedPenetrationToiForced;
+  bool m_enableDeactivation;
+  int8 m_simulationType;
+  bool m_enableSimulationIslands;
+  uint32 m_minDesiredIslandSize;
+  bool m_processActionsInSingleThread;
+  bool m_allowIntegrationOfIslandsWithoutConstraintsInASeparateJob;
+  float m_frameMarkerPsiSnap;
+  bool m_fireCollisionCallbacks;
 };
 
-class hkpPoweredChainDataConstraintInfo
-{
+class hkpPoweredChainDataConstraintInfo {
 public:
-	hkVector4 m_pivotInA;
-	hkVector4 m_pivotInB;
-	hkQuaternion m_aTc;
-	hkQuaternion m_bTc;
-	hkpConstraintMotor *m_motors;
-	bool m_switchBodies;
+  hkVector4 m_pivotInA;
+  hkVector4 m_pivotInB;
+  hkQuaternion m_aTc;
+  hkQuaternion m_bTc;
+  hkpConstraintMotor *m_motors;
+  bool m_switchBodies;
 };
 
-class hkpPoweredChainData : public hkpConstraintChainData
-{
+class hkpPoweredChainData : public hkpConstraintChainData {
 public:
-	virtual ~hkpPoweredChainData();
-	hkpBridgeAtoms m_atoms;
-	hkArray<hkpPoweredChainDataConstraintInfo> m_infos;
-	float m_tau;
-	float m_damping;
-	float m_cfmLinAdd;
-	float m_cfmLinMul;
-	float m_cfmAngAdd;
-	float m_cfmAngMul;
-	float m_maxErrorDistance;
+  virtual ~hkpPoweredChainData();
+  hkpBridgeAtoms m_atoms;
+  hkArray<hkpPoweredChainDataConstraintInfo> m_infos;
+  float m_tau;
+  float m_damping;
+  float m_cfmLinAdd;
+  float m_cfmLinMul;
+  float m_cfmAngAdd;
+  float m_cfmAngMul;
+  float m_maxErrorDistance;
 };
 
-class hkpBinaryAction : public hkpAction
-{
+class hkpBinaryAction : public hkpAction {
 public:
-	hkpEntity *m_entityA;
-	hkpEntity *m_entityB;
+  hkpEntity *m_entityA;
+  hkpEntity *m_entityB;
 };
 
-class hkpAngularDashpotAction : public hkpBinaryAction
-{
+class hkpAngularDashpotAction : public hkpBinaryAction {
 public:
-	virtual ~hkpAngularDashpotAction();
-	hkQuaternion m_rotation;
-	float m_strength;
-	float m_damping;
+  virtual ~hkpAngularDashpotAction();
+  hkQuaternion m_rotation;
+  float m_strength;
+  float m_damping;
 };
 
-class hkpFirstPersonGun : public hkReferencedObject
-{
+class hkpFirstPersonGun : public hkReferencedObject {
 public:
-	virtual ~hkpFirstPersonGun();
-	uint8 m_type;
-	hkStringPtr m_name;
-	uint8 m_keyboardKey;
-	hkArray<void *> m_listeners;
+  virtual ~hkpFirstPersonGun();
+  uint8 m_type;
+  hkStringPtr m_name;
+  uint8 m_keyboardKey;
+  hkArray<void *> m_listeners;
 };
 
-class hkpBallGun : public hkpFirstPersonGun
-{
+class hkpBallGun : public hkpFirstPersonGun {
 public:
-	virtual ~hkpBallGun();
-	float m_bulletRadius;
-	float m_bulletVelocity;
-	float m_bulletMass;
-	float m_damageMultiplier;
-	int32 m_maxBulletsInWorld;
-	hkVector4 m_bulletOffsetFromCenter;
-	void *m_addedBodies;
+  virtual ~hkpBallGun();
+  float m_bulletRadius;
+  float m_bulletVelocity;
+  float m_bulletMass;
+  float m_damageMultiplier;
+  int32 m_maxBulletsInWorld;
+  hkVector4 m_bulletOffsetFromCenter;
+  void *m_addedBodies;
 };
 
-class hkpCharacterControllerCinfo : public hkReferencedObject
-{
+class hkpCharacterControllerCinfo : public hkReferencedObject {
 public:
-	virtual ~hkpCharacterControllerCinfo();
+  virtual ~hkpCharacterControllerCinfo();
 };
 
-class hkpCharacterProxyCinfo : public hkpCharacterControllerCinfo
-{
+class hkpCharacterProxyCinfo : public hkpCharacterControllerCinfo {
 public:
-	virtual ~hkpCharacterProxyCinfo();
-	hkVector4 m_position;
-	hkVector4 m_velocity;
-	float m_dynamicFriction;
-	float m_staticFriction;
-	float m_keepContactTolerance;
-	hkVector4 m_up;
-	float m_extraUpStaticFriction;
-	float m_extraDownStaticFriction;
-	hkpShapePhantom *m_shapePhantom;
-	float m_keepDistance;
-	float m_contactAngleSensitivity;
-	uint32 m_userPlanes;
-	float m_maxCharacterSpeedForSolver;
-	float m_characterStrength;
-	float m_characterMass;
-	float m_maxSlope;
-	float m_penetrationRecoverySpeed;
-	int32 m_maxCastIterations;
-	bool m_refreshManifoldInCheckSupport;
+  virtual ~hkpCharacterProxyCinfo();
+  hkVector4 m_position;
+  hkVector4 m_velocity;
+  float m_dynamicFriction;
+  float m_staticFriction;
+  float m_keepContactTolerance;
+  hkVector4 m_up;
+  float m_extraUpStaticFriction;
+  float m_extraDownStaticFriction;
+  hkpShapePhantom *m_shapePhantom;
+  float m_keepDistance;
+  float m_contactAngleSensitivity;
+  uint32 m_userPlanes;
+  float m_maxCharacterSpeedForSolver;
+  float m_characterStrength;
+  float m_characterMass;
+  float m_maxSlope;
+  float m_penetrationRecoverySpeed;
+  int32 m_maxCastIterations;
+  bool m_refreshManifoldInCheckSupport;
 };
 
-class hkpCharacterRigidBodyCinfo : public hkpCharacterControllerCinfo
-{
+class hkpCharacterRigidBodyCinfo : public hkpCharacterControllerCinfo {
 public:
-	virtual ~hkpCharacterRigidBodyCinfo();
-	uint32 m_collisionFilterInfo;
-	hkpShape *m_shape;
-	hkVector4 m_position;
-	hkQuaternion m_rotation;
-	float m_mass;
-	float m_friction;
-	float m_maxLinearVelocity;
-	float m_allowedPenetrationDepth;
-	hkVector4 m_up;
-	float m_maxSlope;
-	float m_maxForce;
-	float m_unweldingHeightOffsetFactor;
-	float m_maxSpeedForSimplexSolver;
-	float m_supportDistance;
-	float m_hardSupportDistance;
-	int32 m_vdbColor;
+  virtual ~hkpCharacterRigidBodyCinfo();
+  uint32 m_collisionFilterInfo;
+  hkpShape *m_shape;
+  hkVector4 m_position;
+  hkQuaternion m_rotation;
+  float m_mass;
+  float m_friction;
+  float m_maxLinearVelocity;
+  float m_allowedPenetrationDepth;
+  hkVector4 m_up;
+  float m_maxSlope;
+  float m_maxForce;
+  float m_unweldingHeightOffsetFactor;
+  float m_maxSpeedForSimplexSolver;
+  float m_supportDistance;
+  float m_hardSupportDistance;
+  int32 m_vdbColor;
 };
 
-class hkpConstrainedSystemFilter : public hkpCollisionFilter
-{
+class hkpConstrainedSystemFilter : public hkpCollisionFilter {
 public:
-	virtual ~hkpConstrainedSystemFilter();
-	hkpCollisionFilter *m_otherFilter;
+  virtual ~hkpConstrainedSystemFilter();
+  hkpCollisionFilter *m_otherFilter;
 };
 
-class hkpDashpotAction : public hkpBinaryAction
-{
+class hkpDashpotAction : public hkpBinaryAction {
 public:
-	virtual ~hkpDashpotAction();
-	hkVector4 m_point;
-	float m_strength;
-	float m_damping;
-	hkVector4 m_impulse;
+  virtual ~hkpDashpotAction();
+  hkVector4 m_point;
+  float m_strength;
+  float m_damping;
+  hkVector4 m_impulse;
 };
 
-class hkpDisableEntityCollisionFilter : public hkpCollisionFilter
-{
+class hkpDisableEntityCollisionFilter : public hkpCollisionFilter {
 public:
-	virtual ~hkpDisableEntityCollisionFilter();
-	hkArray<hkpEntity *> m_disabledEntities;
+  virtual ~hkpDisableEntityCollisionFilter();
+  hkArray<hkpEntity *> m_disabledEntities;
 };
 
-class hkpDisplayBindingDataRigidBody : public hkReferencedObject
-{
+class hkpDisplayBindingDataRigidBody : public hkReferencedObject {
 public:
-	virtual ~hkpDisplayBindingDataRigidBody();
-	hkpRigidBody *m_rigidBody;
-	hkReferencedObject *m_displayObjectPtr;
-	hkMatrix4 m_rigidBodyFromDisplayObjectTransform;
+  virtual ~hkpDisplayBindingDataRigidBody();
+  hkpRigidBody *m_rigidBody;
+  hkReferencedObject *m_displayObjectPtr;
+  hkMatrix4 m_rigidBodyFromDisplayObjectTransform;
 };
 
-class hkpDisplayBindingDataPhysicsSystem : public hkReferencedObject
-{
+class hkpDisplayBindingDataPhysicsSystem : public hkReferencedObject {
 public:
-	virtual ~hkpDisplayBindingDataPhysicsSystem();
-	hkArray<hkpDisplayBindingDataRigidBody *> m_bindings;
-	hkpPhysicsSystem *m_system;
+  virtual ~hkpDisplayBindingDataPhysicsSystem();
+  hkArray<hkpDisplayBindingDataRigidBody *> m_bindings;
+  hkpPhysicsSystem *m_system;
 };
 
-class hkpDisplayBindingData : public hkReferencedObject
-{
+class hkpDisplayBindingData : public hkReferencedObject {
 public:
-	virtual ~hkpDisplayBindingData();
-	hkArray<hkpDisplayBindingDataRigidBody *> m_rigidBodyBindings;
-	hkArray<hkpDisplayBindingDataPhysicsSystem *> m_physicsSystemBindings;
+  virtual ~hkpDisplayBindingData();
+  hkArray<hkpDisplayBindingDataRigidBody *> m_rigidBodyBindings;
+  hkArray<hkpDisplayBindingDataPhysicsSystem *> m_physicsSystemBindings;
 };
 
-class hkpGravityGun : public hkpFirstPersonGun
-{
+class hkpGravityGun : public hkpFirstPersonGun {
 public:
-	virtual ~hkpGravityGun();
-	hkArray<void *> m_grabbedBodies;
-	int32 m_maxNumObjectsPicked;
-	float m_maxMassOfObjectPicked;
-	float m_maxDistOfObjectPicked;
-	float m_impulseAppliedWhenObjectNotPicked;
-	float m_throwVelocity;
-	hkVector4 m_capturedObjectPosition;
-	hkVector4 m_capturedObjectsOffset;
+  virtual ~hkpGravityGun();
+  hkArray<void *> m_grabbedBodies;
+  int32 m_maxNumObjectsPicked;
+  float m_maxMassOfObjectPicked;
+  float m_maxDistOfObjectPicked;
+  float m_impulseAppliedWhenObjectNotPicked;
+  float m_throwVelocity;
+  hkVector4 m_capturedObjectPosition;
+  hkVector4 m_capturedObjectsOffset;
 };
 
-class hkpGroupCollisionFilter : public hkpCollisionFilter
-{
+class hkpGroupCollisionFilter : public hkpCollisionFilter {
 public:
-	virtual ~hkpGroupCollisionFilter();
-	bool m_noGroupCollisionEnabled;
-	uint32 m_collisionGroups;
+  virtual ~hkpGroupCollisionFilter();
+  bool m_noGroupCollisionEnabled;
+  uint32 m_collisionGroups;
 };
 
-class hkpUnaryAction : public hkpAction
-{
+class hkpUnaryAction : public hkpAction {
 public:
-	hkpEntity *m_entity;
+  hkpEntity *m_entity;
 };
 
-class hkpMotorAction : public hkpUnaryAction
-{
+class hkpMotorAction : public hkpUnaryAction {
 public:
-	virtual ~hkpMotorAction();
-	hkVector4 m_axis;
-	float m_spinRate;
-	float m_gain;
-	bool m_active;
+  virtual ~hkpMotorAction();
+  hkVector4 m_axis;
+  float m_spinRate;
+  float m_gain;
+  bool m_active;
 };
 
-class hkpMountedBallGun : public hkpBallGun
-{
+class hkpMountedBallGun : public hkpBallGun {
 public:
-	virtual ~hkpMountedBallGun();
-	hkVector4 m_position;
+  virtual ~hkpMountedBallGun();
+  hkVector4 m_position;
 };
 
-class hkpMouseSpringAction : public hkpUnaryAction
-{
+class hkpMouseSpringAction : public hkpUnaryAction {
 public:
-	virtual ~hkpMouseSpringAction();
-	hkVector4 m_positionInRbLocal;
-	hkVector4 m_mousePositionInWorld;
-	float m_springDamping;
-	float m_springElasticity;
-	float m_maxRelativeForce;
-	float m_objectDamping;
-	uint32 m_shapeKey;
-	hkArray<void *> m_applyCallbacks;
+  virtual ~hkpMouseSpringAction();
+  hkVector4 m_positionInRbLocal;
+  hkVector4 m_mousePositionInWorld;
+  float m_springDamping;
+  float m_springElasticity;
+  float m_maxRelativeForce;
+  float m_objectDamping;
+  uint32 m_shapeKey;
+  hkArray<void *> m_applyCallbacks;
 };
 
-class hkpPhysicsData : public hkReferencedObject
-{
+class hkpPhysicsData : public hkReferencedObject {
 public:
-	virtual ~hkpPhysicsData();
-	hkpWorldCinfo *m_worldCinfo;
-	hkArray<hkpPhysicsSystem *> m_systems;
+  virtual ~hkpPhysicsData();
+  hkpWorldCinfo *m_worldCinfo;
+  hkArray<hkpPhysicsSystem *> m_systems;
 };
 
-class hkContactPoint
-{
+class hkContactPoint {
 public:
-	hkVector4 m_position;
-	hkVector4 m_separatingNormal;
+  hkVector4 m_position;
+  hkVector4 m_separatingNormal;
 };
 
 class hkpAgent1nSector;
 class hkpSerializedSubTrack1nInfo;
 
-class hkpSerializedTrack1nInfo
-{
+class hkpSerializedTrack1nInfo {
 public:
-	hkArray<hkpAgent1nSector *> m_sectors;
-	hkArray<hkpSerializedSubTrack1nInfo *> m_subTracks;
+  hkArray<hkpAgent1nSector *> m_sectors;
+  hkArray<hkpSerializedSubTrack1nInfo *> m_subTracks;
 };
 
-class hkpSerializedSubTrack1nInfo : public hkpSerializedTrack1nInfo
-{
+class hkpSerializedSubTrack1nInfo : public hkpSerializedTrack1nInfo {
 public:
-	int32 m_sectorIndex;
-	int32 m_offsetInSector;
+  int32 m_sectorIndex;
+  int32 m_offsetInSector;
 };
 
-class hkpAgent1nSector
-{
+class hkpAgent1nSector {
 public:
-	uint32 m_bytesAllocated;
-	uint32 m_pad0;
-	uint32 m_pad1;
-	uint32 m_pad2;
-	uint8 m_data;
+  uint32 m_bytesAllocated;
+  uint32 m_pad0;
+  uint32 m_pad1;
+  uint32 m_pad2;
+  uint8 m_data;
 };
 
-class hkpSimpleContactConstraintDataInfo
-{
+class hkpSimpleContactConstraintDataInfo {
 public:
-	uint16 m_flags;
-	uint16 m_index;
-	float m_internalData0;
-	hkHalf m_rollingFrictionMultiplier;
-	hkHalf m_internalData1;
-	uint32 m_data;
+  uint16 m_flags;
+  uint16 m_index;
+  float m_internalData0;
+  hkHalf m_rollingFrictionMultiplier;
+  hkHalf m_internalData1;
+  uint32 m_data;
 };
 
-class hkpSimpleContactConstraintAtom : public hkpConstraintAtom
-{
+class hkpSimpleContactConstraintAtom : public hkpConstraintAtom {
 public:
-	uint16 m_sizeOfAllAtoms;
-	uint16 m_numContactPoints;
-	uint16 m_numReservedContactPoints;
-	uint8 m_numUserDatasForBodyA;
-	uint8 m_numUserDatasForBodyB;
-	uint8 m_contactPointPropertiesStriding;
-	uint16 m_maxNumContactPoints;
-	hkpSimpleContactConstraintDataInfo m_info;
+  uint16 m_sizeOfAllAtoms;
+  uint16 m_numContactPoints;
+  uint16 m_numReservedContactPoints;
+  uint8 m_numUserDatasForBodyA;
+  uint8 m_numUserDatasForBodyB;
+  uint8 m_contactPointPropertiesStriding;
+  uint16 m_maxNumContactPoints;
+  hkpSimpleContactConstraintDataInfo m_info;
 };
 
-class hkpSerializedAgentNnEntry : public hkReferencedObject
-{
+class hkpSerializedAgentNnEntry : public hkReferencedObject {
 public:
-	virtual ~hkpSerializedAgentNnEntry();
-	hkpEntity *m_bodyA;
-	hkpEntity *m_bodyB;
-	uint64 m_bodyAId;
-	uint64 m_bodyBId;
-	bool m_useEntityIds;
-	int8 m_agentType;
-	hkpSimpleContactConstraintAtom m_atom;
-	hkArray<uint8> m_propertiesStream;
-	hkArray<hkContactPoint> m_contactPoints;
-	hkArray<uint8> m_cpIdMgr;
-	uint8 m_nnEntryData;
-	hkpSerializedTrack1nInfo m_trackInfo;
-	uint8 m_endianCheckBuffer;
-	uint32 m_version;
+  virtual ~hkpSerializedAgentNnEntry();
+  hkpEntity *m_bodyA;
+  hkpEntity *m_bodyB;
+  uint64 m_bodyAId;
+  uint64 m_bodyBId;
+  bool m_useEntityIds;
+  int8 m_agentType;
+  hkpSimpleContactConstraintAtom m_atom;
+  hkArray<uint8> m_propertiesStream;
+  hkArray<hkContactPoint> m_contactPoints;
+  hkArray<uint8> m_cpIdMgr;
+  uint8 m_nnEntryData;
+  hkpSerializedTrack1nInfo m_trackInfo;
+  uint8 m_endianCheckBuffer;
+  uint32 m_version;
 };
 
-class hkpPhysicsSystemWithContacts : public hkpPhysicsSystem
-{
+class hkpPhysicsSystemWithContacts : public hkpPhysicsSystem {
 public:
-	virtual ~hkpPhysicsSystemWithContacts();
-	hkArray<hkpSerializedAgentNnEntry *> m_contacts;
+  virtual ~hkpPhysicsSystemWithContacts();
+  hkArray<hkpSerializedAgentNnEntry *> m_contacts;
 };
 
-class hkpPoweredChainMapperLinkInfo
-{
+class hkpPoweredChainMapperLinkInfo {
 public:
-	int32 m_firstTargetIdx;
-	int32 m_numTargets;
-	hkpConstraintInstance *m_limitConstraint;
+  int32 m_firstTargetIdx;
+  int32 m_numTargets;
+  hkpConstraintInstance *m_limitConstraint;
 };
 
-class hkpPoweredChainMapperTarget
-{
+class hkpPoweredChainMapperTarget {
 public:
-	hkpPoweredChainData *m_chain;
-	int32 m_infoIndex;
+  hkpPoweredChainData *m_chain;
+  int32 m_infoIndex;
 };
 
-class hkpPoweredChainMapper : public hkReferencedObject
-{
+class hkpPoweredChainMapper : public hkReferencedObject {
 public:
-	virtual ~hkpPoweredChainMapper();
-	hkArray<hkpPoweredChainMapperLinkInfo> m_links;
-	hkArray<hkpPoweredChainMapperTarget> m_targets;
-	hkArray<hkpConstraintChainInstance *> m_chains;
+  virtual ~hkpPoweredChainMapper();
+  hkArray<hkpPoweredChainMapperLinkInfo> m_links;
+  hkArray<hkpPoweredChainMapperTarget> m_targets;
+  hkArray<hkpConstraintChainInstance *> m_chains;
 };
 
-class hkpProjectileGun : public hkpFirstPersonGun
-{
+class hkpProjectileGun : public hkpFirstPersonGun {
 public:
-	virtual ~hkpProjectileGun();
-	int32 m_maxProjectiles;
-	float m_reloadTime;
-	float m_reload;
-	hkArray<void *> m_projectiles;
-	void *m_world;
-	void *m_destructionWorld;
+  virtual ~hkpProjectileGun();
+  int32 m_maxProjectiles;
+  float m_reloadTime;
+  float m_reload;
+  hkArray<void *> m_projectiles;
+  void *m_world;
+  void *m_destructionWorld;
 };
 
-class hkpReorientAction : public hkpUnaryAction
-{
+class hkpReorientAction : public hkpUnaryAction {
 public:
-	virtual ~hkpReorientAction();
-	hkVector4 m_rotationAxis;
-	hkVector4 m_upAxis;
-	float m_strength;
-	float m_damping;
+  virtual ~hkpReorientAction();
+  hkVector4 m_rotationAxis;
+  hkVector4 m_upAxis;
+  float m_strength;
+  float m_damping;
 };
 
-class hkpSerializedDisplayMarker : public hkReferencedObject
-{
+class hkpSerializedDisplayMarker : public hkReferencedObject {
 public:
-	virtual ~hkpSerializedDisplayMarker();
-	hkTransform m_transform;
+  virtual ~hkpSerializedDisplayMarker();
+  hkTransform m_transform;
 };
 
-class hkpSerializedDisplayMarkerList : public hkReferencedObject
-{
+class hkpSerializedDisplayMarkerList : public hkReferencedObject {
 public:
-	virtual ~hkpSerializedDisplayMarkerList();
-	hkArray<hkpSerializedDisplayMarker *> m_markers;
+  virtual ~hkpSerializedDisplayMarkerList();
+  hkArray<hkpSerializedDisplayMarker *> m_markers;
 };
 
-class hkpSerializedDisplayRbTransformsDisplayTransformPair
-{
+class hkpSerializedDisplayRbTransformsDisplayTransformPair {
 public:
-	hkpRigidBody *m_rb;
-	hkTransform m_localToDisplay;
+  hkpRigidBody *m_rb;
+  hkTransform m_localToDisplay;
 };
 
-class hkpSerializedDisplayRbTransforms : public hkReferencedObject
-{
+class hkpSerializedDisplayRbTransforms : public hkReferencedObject {
 public:
-	virtual ~hkpSerializedDisplayRbTransforms();
-	hkArray<hkpSerializedDisplayRbTransformsDisplayTransformPair> m_transforms;
+  virtual ~hkpSerializedDisplayRbTransforms();
+  hkArray<hkpSerializedDisplayRbTransformsDisplayTransformPair> m_transforms;
 };
 
-class hkpSpringAction : public hkpBinaryAction
-{
+class hkpSpringAction : public hkpBinaryAction {
 public:
-	virtual ~hkpSpringAction();
-	hkVector4 m_lastForce;
-	hkVector4 m_positionAinA;
-	hkVector4 m_positionBinB;
-	float m_restLength;
-	float m_strength;
-	float m_damping;
-	bool m_onCompression;
-	bool m_onExtension;
+  virtual ~hkpSpringAction();
+  hkVector4 m_lastForce;
+  hkVector4 m_positionAinA;
+  hkVector4 m_positionBinB;
+  float m_restLength;
+  float m_strength;
+  float m_damping;
+  bool m_onCompression;
+  bool m_onExtension;
 };
 
-class hkpTriggerVolumeEventInfo
-{
+class hkpTriggerVolumeEventInfo {
 public:
-	uint64 m_sortValue;
-	hkpRigidBody *m_body;
-	int32 m_operation;
+  uint64 m_sortValue;
+  hkpRigidBody *m_body;
+  int32 m_operation;
 };
 
-class hkpTriggerVolume : public hkReferencedObject
-{
+class hkpTriggerVolume : public hkReferencedObject {
 public:
-	virtual ~hkpTriggerVolume();
-	hkArray<hkpRigidBody *> m_overlappingBodies;
-	hkArray<hkpTriggerVolumeEventInfo> m_eventQueue;
-	hkpRigidBody *m_triggerBody;
-	uint32 m_sequenceNumber;
+  virtual ~hkpTriggerVolume();
+  hkArray<hkpRigidBody *> m_overlappingBodies;
+  hkArray<hkpTriggerVolumeEventInfo> m_eventQueue;
+  hkpRigidBody *m_triggerBody;
+  uint32 m_sequenceNumber;
 };
 
-class hkaAnimatedReferenceFrame : public hkReferencedObject
-{
+class hkaAnimatedReferenceFrame : public hkReferencedObject {
 public:
 };
 
-class hkaAnnotationTrackAnnotation
-{
+class hkaAnnotationTrackAnnotation {
 public:
-	float m_time;
-	hkStringPtr m_text;
+  float m_time;
+  hkStringPtr m_text;
 };
 
-class hkaAnnotationTrack
-{
+class hkaAnnotationTrack {
 public:
-	hkStringPtr m_trackName;
-	hkArray<hkaAnnotationTrackAnnotation> m_annotations;
+  hkStringPtr m_trackName;
+  hkArray<hkaAnnotationTrackAnnotation> m_annotations;
 };
 
-class hkaAnimation : public hkReferencedObject
-{
+class hkaAnimation : public hkReferencedObject {
 public:
-	enum AnimationType
-	{
-		HK_UNKNOWN_ANIMATION,
-		HK_INTERLEAVED_ANIMATION,
-		HK_DELTA_COMPRESSED_ANIMATION,
-		HK_WAVELET_COMPRESSED_ANIMATION,
-		HK_MIRRORED_ANIMATION,
-		HK_SPLINE_COMPRESSED_ANIMATION,
-		HK_QUANTIZED_COMPRESSED_ANIMATION
-	};
-	int32 m_type;
-	float m_duration;
-	int32 m_numberOfTransformTracks;
-	int32 m_numberOfFloatTracks;
-	hkaAnimatedReferenceFrame *m_extractedMotion;
-	hkArray<hkaAnnotationTrack> m_annotationTracks;
+  enum AnimationType {
+    HK_UNKNOWN_ANIMATION,
+    HK_INTERLEAVED_ANIMATION,
+    HK_DELTA_COMPRESSED_ANIMATION,
+    HK_WAVELET_COMPRESSED_ANIMATION,
+    HK_MIRRORED_ANIMATION,
+    HK_SPLINE_COMPRESSED_ANIMATION,
+    HK_QUANTIZED_COMPRESSED_ANIMATION
+  };
+  int32 m_type;
+  float m_duration;
+  int32 m_numberOfTransformTracks;
+  int32 m_numberOfFloatTracks;
+  hkaAnimatedReferenceFrame *m_extractedMotion;
+  hkArray<hkaAnnotationTrack> m_annotationTracks;
 };
 
-class hkaAnimationBinding : public hkReferencedObject
-{
+class hkaAnimationBinding : public hkReferencedObject {
 public:
-	virtual ~hkaAnimationBinding();
-	hkStringPtr m_originalSkeletonName;
-	hkaAnimation *m_animation;
-	hkArray<int16> m_transformTrackToBoneIndices;
-	hkArray<int16> m_floatTrackToFloatSlotIndices;
-	int8 m_blendHint;
+  virtual ~hkaAnimationBinding();
+  hkStringPtr m_originalSkeletonName;
+  hkaAnimation *m_animation;
+  hkArray<int16> m_transformTrackToBoneIndices;
+  hkArray<int16> m_floatTrackToFloatSlotIndices;
+  int8 m_blendHint;
 };
 
-class hkaSkeletonLocalFrameOnBone
-{
+class hkaSkeletonLocalFrameOnBone {
 public:
-	hkLocalFrame *m_localFrame;
-	int32 m_boneIndex;
+  hkLocalFrame *m_localFrame;
+  int32 m_boneIndex;
 };
 
-class hkaBone
-{
+class hkaBone {
 public:
-	hkStringPtr m_name;
-	bool m_lockTranslation;
+  hkStringPtr m_name;
+  bool m_lockTranslation;
 };
 
-class hkaSkeleton : public hkReferencedObject
-{
+class hkaSkeleton : public hkReferencedObject {
 public:
-	virtual ~hkaSkeleton();
-	hkStringPtr m_name;
-	hkArray<int16> m_parentIndices;
-	hkArray<hkaBone> m_bones;
-	hkArray<hkQsTransform> m_referencePose;
-	hkArray<float> m_referenceFloats;
-	hkArray<hkStringPtr> m_floatSlots;
-	hkArray<hkaSkeletonLocalFrameOnBone> m_localFrames;
+  virtual ~hkaSkeleton();
+  hkStringPtr m_name;
+  hkArray<int16> m_parentIndices;
+  hkArray<hkaBone> m_bones;
+  hkArray<hkQsTransform> m_referencePose;
+  hkArray<float> m_referenceFloats;
+  hkArray<hkStringPtr> m_floatSlots;
+  hkArray<hkaSkeletonLocalFrameOnBone> m_localFrames;
 };
 
-class hkaMeshBindingMapping
-{
+class hkaMeshBindingMapping {
 public:
-	hkArray<int16> m_mapping;
+  hkArray<int16> m_mapping;
 };
 
-class hkaMeshBinding : public hkReferencedObject
-{
+class hkaMeshBinding : public hkReferencedObject {
 public:
-	virtual ~hkaMeshBinding();
-	hkxMesh *m_mesh;
-	hkStringPtr m_originalSkeletonName;
-	hkaSkeleton *m_skeleton;
-	hkArray<hkaMeshBindingMapping> m_mappings;
-	hkArray<hkTransform> m_boneFromSkinMeshTransforms;
+  virtual ~hkaMeshBinding();
+  hkxMesh *m_mesh;
+  hkStringPtr m_originalSkeletonName;
+  hkaSkeleton *m_skeleton;
+  hkArray<hkaMeshBindingMapping> m_mappings;
+  hkArray<hkTransform> m_boneFromSkinMeshTransforms;
 };
 
-class hkaBoneAttachment : public hkReferencedObject
-{
+class hkaBoneAttachment : public hkReferencedObject {
 public:
-	virtual ~hkaBoneAttachment();
-	hkStringPtr m_originalSkeletonName;
-	hkMatrix4 m_boneFromAttachment;
-	hkReferencedObject *m_attachment;
-	hkStringPtr m_name;
-	int16 m_boneIndex;
+  virtual ~hkaBoneAttachment();
+  hkStringPtr m_originalSkeletonName;
+  hkMatrix4 m_boneFromAttachment;
+  hkReferencedObject *m_attachment;
+  hkStringPtr m_name;
+  int16 m_boneIndex;
 };
 
-class hkaAnimationContainer : public hkReferencedObject
-{
+class hkaAnimationContainer : public hkReferencedObject {
 public:
-	virtual ~hkaAnimationContainer();
-	hkArray<hkaSkeleton *> m_skeletons;
-	hkArray<hkaAnimation *> m_animations;
-	hkArray<hkaAnimationBinding *> m_bindings;
-	hkArray<hkaBoneAttachment *> m_attachments;
-	hkArray<hkaMeshBinding *> m_skins;
+  virtual ~hkaAnimationContainer();
+  hkArray<hkaSkeleton *> m_skeletons;
+  hkArray<hkaAnimation *> m_animations;
+  hkArray<hkaAnimationBinding *> m_bindings;
+  hkArray<hkaBoneAttachment *> m_attachments;
+  hkArray<hkaMeshBinding *> m_skins;
 };
 
-class hkaAnimationPreviewColorContainer : public hkReferencedObject
-{
+class hkaAnimationPreviewColorContainer : public hkReferencedObject {
 public:
-	virtual ~hkaAnimationPreviewColorContainer();
-	hkArray<uint32> m_previewColor;
+  virtual ~hkaAnimationPreviewColorContainer();
+  hkArray<uint32> m_previewColor;
 };
 
-class hkaDefaultAnimatedReferenceFrame : public hkaAnimatedReferenceFrame
-{
+class hkaDefaultAnimatedReferenceFrame : public hkaAnimatedReferenceFrame {
 public:
-	virtual ~hkaDefaultAnimatedReferenceFrame();
-	hkVector4 m_up;
-	hkVector4 m_forward;
-	float m_duration;
-	hkArray<hkVector4> m_referenceFrameSamples;
+  virtual ~hkaDefaultAnimatedReferenceFrame();
+  hkVector4 m_up;
+  hkVector4 m_forward;
+  float m_duration;
+  hkArray<hkVector4> m_referenceFrameSamples;
 };
 
-class hkaDeltaCompressedAnimationQuantizationFormat
-{
+class hkaDeltaCompressedAnimationQuantizationFormat {
 public:
-	uint8 m_maxBitWidth;
-	uint8 m_preserved;
-	uint32 m_numD;
-	uint32 m_offsetIdx;
-	uint32 m_scaleIdx;
-	uint32 m_bitWidthIdx;
+  uint8 m_maxBitWidth;
+  uint8 m_preserved;
+  uint32 m_numD;
+  uint32 m_offsetIdx;
+  uint32 m_scaleIdx;
+  uint32 m_bitWidthIdx;
 };
 
-class hkaDeltaCompressedAnimation : public hkaAnimation
-{
+class hkaDeltaCompressedAnimation : public hkaAnimation {
 public:
-	virtual ~hkaDeltaCompressedAnimation();
-	int32 m_numberOfPoses;
-	int32 m_blockSize;
-	hkaDeltaCompressedAnimationQuantizationFormat m_qFormat;
-	uint32 m_quantizedDataIdx;
-	uint32 m_quantizedDataSize;
-	uint32 m_staticMaskIdx;
-	uint32 m_staticMaskSize;
-	uint32 m_staticDOFsIdx;
-	uint32 m_staticDOFsSize;
-	uint32 m_numStaticTransformDOFs;
-	uint32 m_numDynamicTransformDOFs;
-	uint32 m_totalBlockSize;
-	uint32 m_lastBlockSize;
-	hkArray<uint8> m_dataBuffer;
+  virtual ~hkaDeltaCompressedAnimation();
+  int32 m_numberOfPoses;
+  int32 m_blockSize;
+  hkaDeltaCompressedAnimationQuantizationFormat m_qFormat;
+  uint32 m_quantizedDataIdx;
+  uint32 m_quantizedDataSize;
+  uint32 m_staticMaskIdx;
+  uint32 m_staticMaskSize;
+  uint32 m_staticDOFsIdx;
+  uint32 m_staticDOFsSize;
+  uint32 m_numStaticTransformDOFs;
+  uint32 m_numDynamicTransformDOFs;
+  uint32 m_totalBlockSize;
+  uint32 m_lastBlockSize;
+  hkArray<uint8> m_dataBuffer;
 };
 
-class hkaFootstepAnalysisInfo : public hkReferencedObject
-{
+class hkaFootstepAnalysisInfo : public hkReferencedObject {
 public:
-	virtual ~hkaFootstepAnalysisInfo();
-	hkArray<char> m_name;
-	hkArray<char> m_nameStrike;
-	hkArray<char> m_nameLift;
-	hkArray<char> m_nameLock;
-	hkArray<char> m_nameUnlock;
-	hkArray<float> m_minPos;
-	hkArray<float> m_maxPos;
-	hkArray<float> m_minVel;
-	hkArray<float> m_maxVel;
-	hkArray<float> m_allBonesDown;
-	hkArray<float> m_anyBonesDown;
-	float m_posTol;
-	float m_velTol;
-	float m_duration;
+  virtual ~hkaFootstepAnalysisInfo();
+  hkArray<char> m_name;
+  hkArray<char> m_nameStrike;
+  hkArray<char> m_nameLift;
+  hkArray<char> m_nameLock;
+  hkArray<char> m_nameUnlock;
+  hkArray<float> m_minPos;
+  hkArray<float> m_maxPos;
+  hkArray<float> m_minVel;
+  hkArray<float> m_maxVel;
+  hkArray<float> m_allBonesDown;
+  hkArray<float> m_anyBonesDown;
+  float m_posTol;
+  float m_velTol;
+  float m_duration;
 };
 
-class hkaFootstepAnalysisInfoContainer : public hkReferencedObject
-{
+class hkaFootstepAnalysisInfoContainer : public hkReferencedObject {
 public:
-	virtual ~hkaFootstepAnalysisInfoContainer();
-	hkArray<hkaFootstepAnalysisInfo *> m_previewInfo;
+  virtual ~hkaFootstepAnalysisInfoContainer();
+  hkArray<hkaFootstepAnalysisInfo *> m_previewInfo;
 };
 
-class hkaInterleavedUncompressedAnimation : public hkaAnimation
-{
+class hkaInterleavedUncompressedAnimation : public hkaAnimation {
 public:
-	virtual ~hkaInterleavedUncompressedAnimation();
-	hkArray<hkQsTransform> m_transforms;
-	hkArray<float> m_floats;
+  virtual ~hkaInterleavedUncompressedAnimation();
+  hkArray<hkQsTransform> m_transforms;
+  hkArray<float> m_floats;
 };
 
-class hkaQuantizedAnimation : public hkaAnimation
-{
+class hkaQuantizedAnimation : public hkaAnimation {
 public:
-	virtual ~hkaQuantizedAnimation();
-	hkArray<uint8> m_data;
-	uint32 m_endian;
-	void *m_skeleton;
+  virtual ~hkaQuantizedAnimation();
+  hkArray<uint8> m_data;
+  uint32 m_endian;
+  void *m_skeleton;
 };
 
-class hkaSkeletonMapperDataChainMapping
-{
+class hkaSkeletonMapperDataChainMapping {
 public:
-	int16 m_startBoneA;
-	int16 m_endBoneA;
-	int16 m_startBoneB;
-	int16 m_endBoneB;
-	hkQsTransform m_startAFromBTransform;
-	hkQsTransform m_endAFromBTransform;
+  int16 m_startBoneA;
+  int16 m_endBoneA;
+  int16 m_startBoneB;
+  int16 m_endBoneB;
+  hkQsTransform m_startAFromBTransform;
+  hkQsTransform m_endAFromBTransform;
 };
 
-class hkaSkeletonMapperDataSimpleMapping
-{
+class hkaSkeletonMapperDataSimpleMapping {
 public:
-	int16 m_boneA;
-	int16 m_boneB;
-	hkQsTransform m_aFromBTransform;
+  int16 m_boneA;
+  int16 m_boneB;
+  hkQsTransform m_aFromBTransform;
 };
 
-class hkaSkeletonMapperData
-{
+class hkaSkeletonMapperData {
 public:
-	hkaSkeleton *m_skeletonA;
-	hkaSkeleton *m_skeletonB;
-	hkArray<hkaSkeletonMapperDataSimpleMapping> m_simpleMappings;
-	hkArray<hkaSkeletonMapperDataChainMapping> m_chainMappings;
-	hkArray<int16> m_unmappedBones;
-	hkQsTransform m_extractedMotionMapping;
-	bool m_keepUnmappedLocal;
-	int32 m_mappingType;
+  hkaSkeleton *m_skeletonA;
+  hkaSkeleton *m_skeletonB;
+  hkArray<hkaSkeletonMapperDataSimpleMapping> m_simpleMappings;
+  hkArray<hkaSkeletonMapperDataChainMapping> m_chainMappings;
+  hkArray<int16> m_unmappedBones;
+  hkQsTransform m_extractedMotionMapping;
+  bool m_keepUnmappedLocal;
+  int32 m_mappingType;
 };
 
-class hkaSkeletonMapper : public hkReferencedObject
-{
+class hkaSkeletonMapper : public hkReferencedObject {
 public:
-	virtual ~hkaSkeletonMapper();
-	hkaSkeletonMapperData m_mapping;
+  virtual ~hkaSkeletonMapper();
+  hkaSkeletonMapperData m_mapping;
 };
 
-class hkaSplineCompressedAnimation : public hkaAnimation
-{
+class hkaSplineCompressedAnimation : public hkaAnimation {
 public:
-	virtual ~hkaSplineCompressedAnimation();
-	int32 m_numFrames;
-	int32 m_numBlocks;
-	int32 m_maxFramesPerBlock;
-	int32 m_maskAndQuantizationSize;
-	float m_blockDuration;
-	float m_blockInverseDuration;
-	float m_frameDuration;
-	hkArray<uint32> m_blockOffsets;
-	hkArray<uint32> m_floatBlockOffsets;
-	hkArray<uint32> m_transformOffsets;
-	hkArray<uint32> m_floatOffsets;
-	hkArray<uint8> m_data;
-	int32 m_endian;
+  virtual ~hkaSplineCompressedAnimation();
+  int32 m_numFrames;
+  int32 m_numBlocks;
+  int32 m_maxFramesPerBlock;
+  int32 m_maskAndQuantizationSize;
+  float m_blockDuration;
+  float m_blockInverseDuration;
+  float m_frameDuration;
+  hkArray<uint32> m_blockOffsets;
+  hkArray<uint32> m_floatBlockOffsets;
+  hkArray<uint32> m_transformOffsets;
+  hkArray<uint32> m_floatOffsets;
+  hkArray<uint8> m_data;
+  int32 m_endian;
 };
 
-class hkaWaveletCompressedAnimationQuantizationFormat
-{
+class hkaWaveletCompressedAnimationQuantizationFormat {
 public:
-	uint8 m_maxBitWidth;
-	uint8 m_preserved;
-	uint32 m_numD;
-	uint32 m_offsetIdx;
-	uint32 m_scaleIdx;
-	uint32 m_bitWidthIdx;
+  uint8 m_maxBitWidth;
+  uint8 m_preserved;
+  uint32 m_numD;
+  uint32 m_offsetIdx;
+  uint32 m_scaleIdx;
+  uint32 m_bitWidthIdx;
 };
 
-class hkaWaveletCompressedAnimation : public hkaAnimation
-{
+class hkaWaveletCompressedAnimation : public hkaAnimation {
 public:
-	virtual ~hkaWaveletCompressedAnimation();
-	int32 m_numberOfPoses;
-	int32 m_blockSize;
-	hkaWaveletCompressedAnimationQuantizationFormat m_qFormat;
-	uint32 m_staticMaskIdx;
-	uint32 m_staticDOFsIdx;
-	uint32 m_numStaticTransformDOFs;
-	uint32 m_numDynamicTransformDOFs;
-	uint32 m_blockIndexIdx;
-	uint32 m_blockIndexSize;
-	uint32 m_quantizedDataIdx;
-	uint32 m_quantizedDataSize;
-	hkArray<uint8> m_dataBuffer;
+  virtual ~hkaWaveletCompressedAnimation();
+  int32 m_numberOfPoses;
+  int32 m_blockSize;
+  hkaWaveletCompressedAnimationQuantizationFormat m_qFormat;
+  uint32 m_staticMaskIdx;
+  uint32 m_staticDOFsIdx;
+  uint32 m_numStaticTransformDOFs;
+  uint32 m_numDynamicTransformDOFs;
+  uint32 m_blockIndexIdx;
+  uint32 m_blockIndexSize;
+  uint32 m_quantizedDataIdx;
+  uint32 m_quantizedDataSize;
+  hkArray<uint8> m_dataBuffer;
 };
 
-class hkaRagdollInstance : public hkReferencedObject
-{
+class hkaRagdollInstance : public hkReferencedObject {
 public:
-	virtual ~hkaRagdollInstance();
-	hkArray<hkpRigidBody *> m_rigidBodies;
-	hkArray<hkpConstraintInstance *> m_constraints;
-	hkArray<int32> m_boneToRigidBodyMap;
-	hkaSkeleton *m_skeleton;
+  virtual ~hkaRagdollInstance();
+  hkArray<hkpRigidBody *> m_rigidBodies;
+  hkArray<hkpConstraintInstance *> m_constraints;
+  hkArray<int32> m_boneToRigidBodyMap;
+  hkaSkeleton *m_skeleton;
 };
 
-class hkbVariableBindingSetBinding
-{
+class hkbVariableBindingSetBinding {
 public:
-	hkStringPtr m_memberPath;
-	void *m_memberClass;
-	int32 m_offsetInObjectPlusOne;
-	int32 m_offsetInArrayPlusOne;
-	int32 m_rootVariableIndex;
-	int32 m_variableIndex;
-	int8 m_bitIndex;
-	int8 m_bindingType;
-	uint8 m_memberType;
-	int8 m_variableType;
-	hkFlags m_flags;
+  hkStringPtr m_memberPath;
+  void *m_memberClass;
+  int32 m_offsetInObjectPlusOne;
+  int32 m_offsetInArrayPlusOne;
+  int32 m_rootVariableIndex;
+  int32 m_variableIndex;
+  int8 m_bitIndex;
+  int8 m_bindingType;
+  uint8 m_memberType;
+  int8 m_variableType;
+  hkFlags m_flags;
 };
 
-class hkbVariableBindingSet : public hkReferencedObject
-{
+class hkbVariableBindingSet : public hkReferencedObject {
 public:
-	virtual ~hkbVariableBindingSet();
-	hkArray<hkbVariableBindingSetBinding> m_bindings;
-	int32 m_indexOfBindingToEnable;
-	bool m_hasOutputBinding;
+  virtual ~hkbVariableBindingSet();
+  hkArray<hkbVariableBindingSetBinding> m_bindings;
+  int32 m_indexOfBindingToEnable;
+  bool m_hasOutputBinding;
 };
 
-class hkbBindable : public hkReferencedObject
-{
+class hkbBindable : public hkReferencedObject {
 public:
-	virtual ~hkbBindable();
-	hkbVariableBindingSet *m_variableBindingSet;
-	hkArray<void> m_cachedBindables;
-	bool m_areBindablesCached;
+  virtual ~hkbBindable();
+  hkbVariableBindingSet *m_variableBindingSet;
+  hkArray<void> m_cachedBindables;
+  bool m_areBindablesCached;
 };
 
-class hkbNode : public hkbBindable
-{
+class hkbNode : public hkbBindable {
 public:
-	virtual ~hkbNode();
-	uint64 m_userData;
-	hkStringPtr m_name;
-	int16 m_id;
-	int8 m_cloneState;
-	bool m_padNode;
+  virtual ~hkbNode();
+  uint64 m_userData;
+  hkStringPtr m_name;
+  int16 m_id;
+  int8 m_cloneState;
+  bool m_padNode;
 };
 
-class hkbModifier : public hkbNode
-{
+class hkbModifier : public hkbNode {
 public:
-	virtual ~hkbModifier();
-	bool m_enable;
-	bool m_padModifier;
+  virtual ~hkbModifier();
+  bool m_enable;
+  bool m_padModifier;
 };
 
-class hkbEventPayload : public hkReferencedObject
-{
+class hkbEventPayload : public hkReferencedObject {
 public:
-	virtual ~hkbEventPayload();
+  virtual ~hkbEventPayload();
 };
 
-class hkbEventBase
-{
+class hkbEventBase {
 public:
-	int32 m_id;
-	hkbEventPayload *m_payload;
+  int32 m_id;
+  hkbEventPayload *m_payload;
 };
 
-class hkbEventProperty : public hkbEventBase
-{
+class hkbEventProperty : public hkbEventBase {
 public:
 };
 
-class hkbProjectStringData : public hkReferencedObject
-{
+class hkbProjectStringData : public hkReferencedObject {
 public:
-	virtual ~hkbProjectStringData();
-	hkArray<hkStringPtr> m_animationFilenames;
-	hkArray<hkStringPtr> m_behaviorFilenames;
-	hkArray<hkStringPtr> m_characterFilenames;
-	hkArray<hkStringPtr> m_eventNames;
-	hkStringPtr m_animationPath;
-	hkStringPtr m_behaviorPath;
-	hkStringPtr m_characterPath;
-	hkStringPtr m_fullPathToSource;
-	hkStringPtr m_rootPath;
+  virtual ~hkbProjectStringData();
+  hkArray<hkStringPtr> m_animationFilenames;
+  hkArray<hkStringPtr> m_behaviorFilenames;
+  hkArray<hkStringPtr> m_characterFilenames;
+  hkArray<hkStringPtr> m_eventNames;
+  hkStringPtr m_animationPath;
+  hkStringPtr m_behaviorPath;
+  hkStringPtr m_characterPath;
+  hkStringPtr m_fullPathToSource;
+  hkStringPtr m_rootPath;
 };
 
-class hkbProjectData : public hkReferencedObject
-{
+class hkbProjectData : public hkReferencedObject {
 public:
-	virtual ~hkbProjectData();
-	hkVector4 m_worldUpWS;
-	hkbProjectStringData *m_stringData;
-	int8 m_defaultEventMode;
+  virtual ~hkbProjectData();
+  hkVector4 m_worldUpWS;
+  hkbProjectStringData *m_stringData;
+  int8 m_defaultEventMode;
 };
 
-class hkbHandIkDriverInfoHand
-{
+class hkbHandIkDriverInfoHand {
 public:
-	hkVector4 m_elbowAxisLS;
-	hkVector4 m_backHandNormalLS;
-	hkVector4 m_handOffsetLS;
-	hkQuaternion m_handOrienationOffsetLS;
-	float m_maxElbowAngleDegrees;
-	float m_minElbowAngleDegrees;
-	int16 m_shoulderIndex;
-	int16 m_shoulderSiblingIndex;
-	int16 m_elbowIndex;
-	int16 m_elbowSiblingIndex;
-	int16 m_wristIndex;
-	bool m_enforceEndPosition;
-	bool m_enforceEndRotation;
-	hkStringPtr m_localFrameName;
+  hkVector4 m_elbowAxisLS;
+  hkVector4 m_backHandNormalLS;
+  hkVector4 m_handOffsetLS;
+  hkQuaternion m_handOrienationOffsetLS;
+  float m_maxElbowAngleDegrees;
+  float m_minElbowAngleDegrees;
+  int16 m_shoulderIndex;
+  int16 m_shoulderSiblingIndex;
+  int16 m_elbowIndex;
+  int16 m_elbowSiblingIndex;
+  int16 m_wristIndex;
+  bool m_enforceEndPosition;
+  bool m_enforceEndRotation;
+  hkStringPtr m_localFrameName;
 };
 
-class hkbHandIkDriverInfo : public hkReferencedObject
-{
+class hkbHandIkDriverInfo : public hkReferencedObject {
 public:
-	virtual ~hkbHandIkDriverInfo();
-	hkArray<hkbHandIkDriverInfoHand> m_hands;
-	int8 m_fadeInOutCurve;
+  virtual ~hkbHandIkDriverInfo();
+  hkArray<hkbHandIkDriverInfoHand> m_hands;
+  int8 m_fadeInOutCurve;
 };
 
-class hkbRoleAttribute
-{
+class hkbRoleAttribute {
 public:
-	int16 m_role;
-	hkFlags m_flags;
+  int16 m_role;
+  hkFlags m_flags;
 };
 
-class hkbVariableInfo
-{
+class hkbVariableInfo {
 public:
-	hkbRoleAttribute m_role;
-	int8 m_type;
+  hkbRoleAttribute m_role;
+  int8 m_type;
 };
 
-class hkbCharacterDataCharacterControllerInfo
-{
+class hkbCharacterDataCharacterControllerInfo {
 public:
-	float m_capsuleHeight;
-	float m_capsuleRadius;
-	uint32 m_collisionFilterInfo;
-	hkpCharacterControllerCinfo *m_characterControllerCinfo;
+  float m_capsuleHeight;
+  float m_capsuleRadius;
+  uint32 m_collisionFilterInfo;
+  hkpCharacterControllerCinfo *m_characterControllerCinfo;
 };
 
-class hkbFootIkDriverInfoLeg
-{
+class hkbFootIkDriverInfoLeg {
 public:
-	hkQuaternion m_prevAnkleRotLS;
-	hkVector4 m_kneeAxisLS;
-	hkVector4 m_footEndLS;
-	float m_footPlantedAnkleHeightMS;
-	float m_footRaisedAnkleHeightMS;
-	float m_maxAnkleHeightMS;
-	float m_minAnkleHeightMS;
-	float m_maxKneeAngleDegrees;
-	float m_minKneeAngleDegrees;
-	float m_maxAnkleAngleDegrees;
-	int16 m_hipIndex;
-	int16 m_kneeIndex;
-	int16 m_ankleIndex;
+  hkQuaternion m_prevAnkleRotLS;
+  hkVector4 m_kneeAxisLS;
+  hkVector4 m_footEndLS;
+  float m_footPlantedAnkleHeightMS;
+  float m_footRaisedAnkleHeightMS;
+  float m_maxAnkleHeightMS;
+  float m_minAnkleHeightMS;
+  float m_maxKneeAngleDegrees;
+  float m_minKneeAngleDegrees;
+  float m_maxAnkleAngleDegrees;
+  int16 m_hipIndex;
+  int16 m_kneeIndex;
+  int16 m_ankleIndex;
 };
 
-class hkbFootIkDriverInfo : public hkReferencedObject
-{
+class hkbFootIkDriverInfo : public hkReferencedObject {
 public:
-	virtual ~hkbFootIkDriverInfo();
-	hkArray<hkbFootIkDriverInfoLeg> m_legs;
-	float m_raycastDistanceUp;
-	float m_raycastDistanceDown;
-	float m_originalGroundHeightMS;
-	float m_verticalOffset;
-	uint32 m_collisionFilterInfo;
-	float m_forwardAlignFraction;
-	float m_sidewaysAlignFraction;
-	float m_sidewaysSampleWidth;
-	bool m_lockFeetWhenPlanted;
-	bool m_useCharacterUpVector;
-	bool m_isQuadrupedNarrow;
+  virtual ~hkbFootIkDriverInfo();
+  hkArray<hkbFootIkDriverInfoLeg> m_legs;
+  float m_raycastDistanceUp;
+  float m_raycastDistanceDown;
+  float m_originalGroundHeightMS;
+  float m_verticalOffset;
+  uint32 m_collisionFilterInfo;
+  float m_forwardAlignFraction;
+  float m_sidewaysAlignFraction;
+  float m_sidewaysSampleWidth;
+  bool m_lockFeetWhenPlanted;
+  bool m_useCharacterUpVector;
+  bool m_isQuadrupedNarrow;
 };
 
-class hkbMirroredSkeletonInfo : public hkReferencedObject
-{
+class hkbMirroredSkeletonInfo : public hkReferencedObject {
 public:
-	virtual ~hkbMirroredSkeletonInfo();
-	hkVector4 m_mirrorAxis;
-	hkArray<int16> m_bonePairMap;
+  virtual ~hkbMirroredSkeletonInfo();
+  hkVector4 m_mirrorAxis;
+  hkArray<int16> m_bonePairMap;
 };
 
-class hkbCharacterStringData : public hkReferencedObject
-{
+class hkbCharacterStringData : public hkReferencedObject {
 public:
-	virtual ~hkbCharacterStringData();
-	hkArray<hkStringPtr> m_deformableSkinNames;
-	hkArray<hkStringPtr> m_rigidSkinNames;
-	hkArray<hkStringPtr> m_animationNames;
-	hkArray<hkStringPtr> m_animationFilenames;
-	hkArray<hkStringPtr> m_characterPropertyNames;
-	hkArray<hkStringPtr> m_retargetingSkeletonMapperFilenames;
-	hkArray<hkStringPtr> m_lodNames;
-	hkArray<hkStringPtr> m_mirroredSyncPointSubstringsA;
-	hkArray<hkStringPtr> m_mirroredSyncPointSubstringsB;
-	hkStringPtr m_name;
-	hkStringPtr m_rigName;
-	hkStringPtr m_ragdollName;
-	hkStringPtr m_behaviorFilename;
+  virtual ~hkbCharacterStringData();
+  hkArray<hkStringPtr> m_deformableSkinNames;
+  hkArray<hkStringPtr> m_rigidSkinNames;
+  hkArray<hkStringPtr> m_animationNames;
+  hkArray<hkStringPtr> m_animationFilenames;
+  hkArray<hkStringPtr> m_characterPropertyNames;
+  hkArray<hkStringPtr> m_retargetingSkeletonMapperFilenames;
+  hkArray<hkStringPtr> m_lodNames;
+  hkArray<hkStringPtr> m_mirroredSyncPointSubstringsA;
+  hkArray<hkStringPtr> m_mirroredSyncPointSubstringsB;
+  hkStringPtr m_name;
+  hkStringPtr m_rigName;
+  hkStringPtr m_ragdollName;
+  hkStringPtr m_behaviorFilename;
 };
 
-class hkbVariableValue
-{
+class hkbVariableValue {
 public:
-	int32 m_value;
+  int32 m_value;
 };
 
-class hkbVariableValueSet : public hkReferencedObject
-{
+class hkbVariableValueSet : public hkReferencedObject {
 public:
-	virtual ~hkbVariableValueSet();
-	hkArray<hkbVariableValue> m_wordVariableValues;
-	hkArray<hkVector4> m_quadVariableValues;
-	hkArray<hkReferencedObject *> m_variantVariableValues;
+  virtual ~hkbVariableValueSet();
+  hkArray<hkbVariableValue> m_wordVariableValues;
+  hkArray<hkVector4> m_quadVariableValues;
+  hkArray<hkReferencedObject *> m_variantVariableValues;
 };
 
-class hkbCharacterData : public hkReferencedObject
-{
+class hkbCharacterData : public hkReferencedObject {
 public:
-	virtual ~hkbCharacterData();
-	hkbCharacterDataCharacterControllerInfo m_characterControllerInfo;
-	hkVector4 m_modelUpMS;
-	hkVector4 m_modelForwardMS;
-	hkVector4 m_modelRightMS;
-	hkArray<hkbVariableInfo> m_characterPropertyInfos;
-	hkArray<int32> m_numBonesPerLod;
-	hkbVariableValueSet *m_characterPropertyValues;
-	hkbFootIkDriverInfo *m_footIkDriverInfo;
-	hkbHandIkDriverInfo *m_handIkDriverInfo;
-	hkbCharacterStringData *m_stringData;
-	hkbMirroredSkeletonInfo *m_mirroredSkeletonInfo;
-	float m_scale;
-	int16 m_numHands;
-	int16 m_numFloatSlots;
+  virtual ~hkbCharacterData();
+  hkbCharacterDataCharacterControllerInfo m_characterControllerInfo;
+  hkVector4 m_modelUpMS;
+  hkVector4 m_modelForwardMS;
+  hkVector4 m_modelRightMS;
+  hkArray<hkbVariableInfo> m_characterPropertyInfos;
+  hkArray<int32> m_numBonesPerLod;
+  hkbVariableValueSet *m_characterPropertyValues;
+  hkbFootIkDriverInfo *m_footIkDriverInfo;
+  hkbHandIkDriverInfo *m_handIkDriverInfo;
+  hkbCharacterStringData *m_stringData;
+  hkbMirroredSkeletonInfo *m_mirroredSkeletonInfo;
+  float m_scale;
+  int16 m_numHands;
+  int16 m_numFloatSlots;
 };
 
-class hkbCharacterSetup : public hkReferencedObject
-{
+class hkbCharacterSetup : public hkReferencedObject {
 public:
-	virtual ~hkbCharacterSetup();
-	hkArray<hkaSkeletonMapper *> m_retargetingSkeletonMappers;
-	hkaSkeleton *m_animationSkeleton;
-	hkaSkeletonMapper *m_ragdollToAnimationSkeletonMapper;
-	hkaSkeletonMapper *m_animationToRagdollSkeletonMapper;
-	void *m_animationBindingSet;
-	hkbCharacterData *m_data;
-	void *m_mirroredSkeleton;
-	void *m_characterPropertyIdMap;
+  virtual ~hkbCharacterSetup();
+  hkArray<hkaSkeletonMapper *> m_retargetingSkeletonMappers;
+  hkaSkeleton *m_animationSkeleton;
+  hkaSkeletonMapper *m_ragdollToAnimationSkeletonMapper;
+  hkaSkeletonMapper *m_animationToRagdollSkeletonMapper;
+  void *m_animationBindingSet;
+  hkbCharacterData *m_data;
+  void *m_mirroredSkeleton;
+  void *m_characterPropertyIdMap;
 };
 
-class hkbGenerator : public hkbNode
-{
+class hkbGenerator : public hkbNode {
 public:
 };
 
-class hkbBehaviorGraphStringData : public hkReferencedObject
-{
+class hkbBehaviorGraphStringData : public hkReferencedObject {
 public:
-	virtual ~hkbBehaviorGraphStringData();
-	hkArray<hkStringPtr> m_eventNames;
-	hkArray<hkStringPtr> m_attributeNames;
-	hkArray<hkStringPtr> m_variableNames;
-	hkArray<hkStringPtr> m_characterPropertyNames;
+  virtual ~hkbBehaviorGraphStringData();
+  hkArray<hkStringPtr> m_eventNames;
+  hkArray<hkStringPtr> m_attributeNames;
+  hkArray<hkStringPtr> m_variableNames;
+  hkArray<hkStringPtr> m_characterPropertyNames;
 };
 
-class hkbEventInfo
-{
+class hkbEventInfo {
 public:
-	hkFlags m_flags;
+  hkFlags m_flags;
 };
 
-class hkbBehaviorGraphData : public hkReferencedObject
-{
+class hkbBehaviorGraphData : public hkReferencedObject {
 public:
-	virtual ~hkbBehaviorGraphData();
-	hkArray<float> m_attributeDefaults;
-	hkArray<hkbVariableInfo> m_variableInfos;
-	hkArray<hkbVariableInfo> m_characterPropertyInfos;
-	hkArray<hkbEventInfo> m_eventInfos;
-	hkArray<hkbVariableValue> m_wordMinVariableValues;
-	hkArray<hkbVariableValue> m_wordMaxVariableValues;
-	hkbVariableValueSet *m_variableInitialValues;
-	hkbBehaviorGraphStringData *m_stringData;
+  virtual ~hkbBehaviorGraphData();
+  hkArray<float> m_attributeDefaults;
+  hkArray<hkbVariableInfo> m_variableInfos;
+  hkArray<hkbVariableInfo> m_characterPropertyInfos;
+  hkArray<hkbEventInfo> m_eventInfos;
+  hkArray<hkbVariableValue> m_wordMinVariableValues;
+  hkArray<hkbVariableValue> m_wordMaxVariableValues;
+  hkbVariableValueSet *m_variableInitialValues;
+  hkbBehaviorGraphStringData *m_stringData;
 };
 
-class hkbBehaviorGraph : public hkbGenerator
-{
+class hkbBehaviorGraph : public hkbGenerator {
 public:
-	virtual ~hkbBehaviorGraph();
-	int8 m_variableMode;
-	hkArray<void> m_uniqueIdPool;
-	void *m_idToStateMachineTemplateMap;
-	hkArray<void> m_mirroredExternalIdMap;
-	void *m_pseudoRandomGenerator;
-	hkbGenerator *m_rootGenerator;
-	hkbBehaviorGraphData *m_data;
-	void *m_rootGeneratorClone;
-	void *m_activeNodes;
-	void *m_activeNodeTemplateToIndexMap;
-	void *m_activeNodesChildrenIndices;
-	void *m_globalTransitionData;
-	void *m_eventIdMap;
-	void *m_attributeIdMap;
-	void *m_variableIdMap;
-	void *m_characterPropertyIdMap;
-	void *m_variableValueSet;
-	void *m_nodeTemplateToCloneMap;
-	void *m_nodeCloneToTemplateMap;
-	void *m_stateListenerTemplateToCloneMap;
-	void *m_nodePartitionInfo;
-	int32 m_numIntermediateOutputs;
-	hkArray<void *> m_jobs;
-	hkArray<void *> m_allPartitionMemory;
-	int16 m_numStaticNodes;
-	int16 m_nextUniqueId;
-	bool m_isActive;
-	bool m_isLinked;
-	bool m_updateActiveNodes;
-	bool m_stateOrTransitionChanged;
+  virtual ~hkbBehaviorGraph();
+  int8 m_variableMode;
+  hkArray<void> m_uniqueIdPool;
+  void *m_idToStateMachineTemplateMap;
+  hkArray<void> m_mirroredExternalIdMap;
+  void *m_pseudoRandomGenerator;
+  hkbGenerator *m_rootGenerator;
+  hkbBehaviorGraphData *m_data;
+  void *m_rootGeneratorClone;
+  void *m_activeNodes;
+  void *m_activeNodeTemplateToIndexMap;
+  void *m_activeNodesChildrenIndices;
+  void *m_globalTransitionData;
+  void *m_eventIdMap;
+  void *m_attributeIdMap;
+  void *m_variableIdMap;
+  void *m_characterPropertyIdMap;
+  void *m_variableValueSet;
+  void *m_nodeTemplateToCloneMap;
+  void *m_nodeCloneToTemplateMap;
+  void *m_stateListenerTemplateToCloneMap;
+  void *m_nodePartitionInfo;
+  int32 m_numIntermediateOutputs;
+  hkArray<void *> m_jobs;
+  hkArray<void *> m_allPartitionMemory;
+  int16 m_numStaticNodes;
+  int16 m_nextUniqueId;
+  bool m_isActive;
+  bool m_isLinked;
+  bool m_updateActiveNodes;
+  bool m_stateOrTransitionChanged;
 };
 
-class hkbCharacter : public hkReferencedObject
-{
+class hkbCharacter : public hkReferencedObject {
 public:
-	virtual ~hkbCharacter();
-	hkArray<hkbCharacter *> m_nearbyCharacters;
-	int16 m_currentLod;
-	int16 m_numTracksInLod;
-	hkStringPtr m_name;
-	void *m_ragdollDriver;
-	void *m_characterControllerDriver;
-	void *m_footIkDriver;
-	void *m_handIkDriver;
-	hkbCharacterSetup *m_setup;
-	hkbBehaviorGraph *m_behaviorGraph;
-	hkbProjectData *m_projectData;
-	void *m_animationBindingSet;
-	void *m_raycastInterface;
-	void *m_world;
-	void *m_eventQueue;
-	void *m_worldFromModel;
-	void *m_poseLocal;
-	bool m_deleteWorldFromModel;
-	bool m_deletePoseLocal;
+  virtual ~hkbCharacter();
+  hkArray<hkbCharacter *> m_nearbyCharacters;
+  int16 m_currentLod;
+  int16 m_numTracksInLod;
+  hkStringPtr m_name;
+  void *m_ragdollDriver;
+  void *m_characterControllerDriver;
+  void *m_footIkDriver;
+  void *m_handIkDriver;
+  hkbCharacterSetup *m_setup;
+  hkbBehaviorGraph *m_behaviorGraph;
+  hkbProjectData *m_projectData;
+  void *m_animationBindingSet;
+  void *m_raycastInterface;
+  void *m_world;
+  void *m_eventQueue;
+  void *m_worldFromModel;
+  void *m_poseLocal;
+  bool m_deleteWorldFromModel;
+  bool m_deletePoseLocal;
 };
 
-class hkbHandle : public hkReferencedObject
-{
+class hkbHandle : public hkReferencedObject {
 public:
-	virtual ~hkbHandle();
-	hkLocalFrame *m_frame;
-	hkpRigidBody *m_rigidBody;
-	hkbCharacter *m_character;
-	int16 m_animationBoneIndex;
+  virtual ~hkbHandle();
+  hkLocalFrame *m_frame;
+  hkpRigidBody *m_rigidBody;
+  hkbCharacter *m_character;
+  int16 m_animationBoneIndex;
 };
 
-class hkbAttachmentSetup : public hkReferencedObject
-{
+class hkbAttachmentSetup : public hkReferencedObject {
 public:
-	virtual ~hkbAttachmentSetup();
-	float m_blendInTime;
-	float m_moveAttacherFraction;
-	float m_gain;
-	float m_extrapolationTimeStep;
-	float m_fixUpGain;
-	float m_maxLinearDistance;
-	float m_maxAngularDistance;
-	int8 m_attachmentType;
+  virtual ~hkbAttachmentSetup();
+  float m_blendInTime;
+  float m_moveAttacherFraction;
+  float m_gain;
+  float m_extrapolationTimeStep;
+  float m_fixUpGain;
+  float m_maxLinearDistance;
+  float m_maxAngularDistance;
+  int8 m_attachmentType;
 };
 
-class hkbAttachmentModifier : public hkbModifier
-{
+class hkbAttachmentModifier : public hkbModifier {
 public:
-	virtual ~hkbAttachmentModifier();
-	hkbEventProperty m_sendToAttacherOnAttach;
-	hkbEventProperty m_sendToAttacheeOnAttach;
-	hkbEventProperty m_sendToAttacherOnDetach;
-	hkbEventProperty m_sendToAttacheeOnDetach;
-	hkbAttachmentSetup *m_attachmentSetup;
-	hkbHandle *m_attacherHandle;
-	hkbHandle *m_attacheeHandle;
-	int32 m_attacheeLayer;
-	void *m_attacheeRB;
-	uint8 m_oldMotionType;
-	int32 m_oldFilterInfo;
-	void *m_attachment;
+  virtual ~hkbAttachmentModifier();
+  hkbEventProperty m_sendToAttacherOnAttach;
+  hkbEventProperty m_sendToAttacheeOnAttach;
+  hkbEventProperty m_sendToAttacherOnDetach;
+  hkbEventProperty m_sendToAttacheeOnDetach;
+  hkbAttachmentSetup *m_attachmentSetup;
+  hkbHandle *m_attacherHandle;
+  hkbHandle *m_attacheeHandle;
+  int32 m_attacheeLayer;
+  void *m_attacheeRB;
+  uint8 m_oldMotionType;
+  int32 m_oldFilterInfo;
+  void *m_attachment;
 };
 
-class hkbAttributeModifierAssignment
-{
+class hkbAttributeModifierAssignment {
 public:
-	int32 m_attributeIndex;
-	float m_attributeValue;
+  int32 m_attributeIndex;
+  float m_attributeValue;
 };
 
-class hkbAttributeModifier : public hkbModifier
-{
+class hkbAttributeModifier : public hkbModifier {
 public:
-	virtual ~hkbAttributeModifier();
-	hkArray<hkbAttributeModifierAssignment> m_assignments;
+  virtual ~hkbAttributeModifier();
+  hkArray<hkbAttributeModifierAssignment> m_assignments;
 };
 
-class hkbGeneratorSyncInfoSyncPoint
-{
+class hkbGeneratorSyncInfoSyncPoint {
 public:
-	int32 m_id;
-	float m_time;
+  int32 m_id;
+  float m_time;
 };
 
-class hkbGeneratorSyncInfo
-{
+class hkbGeneratorSyncInfo {
 public:
-	hkbGeneratorSyncInfoSyncPoint m_syncPoints;
-	float m_baseFrequency;
-	float m_localTime;
-	float m_playbackSpeed;
-	int8 m_numSyncPoints;
-	bool m_isCyclic;
-	bool m_isMirrored;
-	bool m_isAdditive;
+  hkbGeneratorSyncInfoSyncPoint m_syncPoints;
+  float m_baseFrequency;
+  float m_localTime;
+  float m_playbackSpeed;
+  int8 m_numSyncPoints;
+  bool m_isCyclic;
+  bool m_isMirrored;
+  bool m_isAdditive;
 };
 
-class hkbNodeInternalStateInfo : public hkReferencedObject
-{
+class hkbNodeInternalStateInfo : public hkReferencedObject {
 public:
-	virtual ~hkbNodeInternalStateInfo();
-	hkbGeneratorSyncInfo m_syncInfo;
-	hkStringPtr m_name;
-	hkReferencedObject *m_internalState;
-	int16 m_nodeId;
-	bool m_hasActivateBeenCalled;
+  virtual ~hkbNodeInternalStateInfo();
+  hkbGeneratorSyncInfo m_syncInfo;
+  hkStringPtr m_name;
+  hkReferencedObject *m_internalState;
+  int16 m_nodeId;
+  bool m_hasActivateBeenCalled;
 };
 
-class hkbBehaviorGraphInternalState : public hkReferencedObject
-{
+class hkbBehaviorGraphInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbBehaviorGraphInternalState();
-	hkArray<hkbNodeInternalStateInfo *> m_nodeInternalStateInfos;
-	hkbVariableValueSet *m_variableValueSet;
+  virtual ~hkbBehaviorGraphInternalState();
+  hkArray<hkbNodeInternalStateInfo *> m_nodeInternalStateInfos;
+  hkbVariableValueSet *m_variableValueSet;
 };
 
-class hkbBehaviorReferenceGenerator : public hkbGenerator
-{
+class hkbBehaviorReferenceGenerator : public hkbGenerator {
 public:
-	virtual ~hkbBehaviorReferenceGenerator();
-	hkStringPtr m_behaviorName;
-	void *m_behavior;
+  virtual ~hkbBehaviorReferenceGenerator();
+  hkStringPtr m_behaviorName;
+  void *m_behavior;
 };
 
-class hkbBoneWeightArray : public hkbBindable
-{
+class hkbBoneWeightArray : public hkbBindable {
 public:
-	virtual ~hkbBoneWeightArray();
-	hkArray<float> m_boneWeights;
+  virtual ~hkbBoneWeightArray();
+  hkArray<float> m_boneWeights;
 };
 
-class hkbBlenderGeneratorChild : public hkbBindable
-{
+class hkbBlenderGeneratorChild : public hkbBindable {
 public:
-	virtual ~hkbBlenderGeneratorChild();
-	hkbGenerator *m_generator;
-	hkbBoneWeightArray *m_boneWeights;
-	float m_weight;
-	float m_worldFromModelWeight;
+  virtual ~hkbBlenderGeneratorChild();
+  hkbGenerator *m_generator;
+  hkbBoneWeightArray *m_boneWeights;
+  float m_weight;
+  float m_worldFromModelWeight;
 };
 
-class hkbBlenderGenerator : public hkbGenerator
-{
+class hkbBlenderGenerator : public hkbGenerator {
 public:
-	virtual ~hkbBlenderGenerator();
-	float m_referencePoseWeightThreshold;
-	float m_blendParameter;
-	float m_minCyclicBlendParameter;
-	float m_maxCyclicBlendParameter;
-	int16 m_indexOfSyncMasterChild;
-	int16 m_flags;
-	bool m_subtractLastChild;
-	hkArray<hkbBlenderGeneratorChild *> m_children;
-	hkArray<void> m_childrenInternalStates;
-	hkArray<void> m_sortedChildren;
-	float m_endIntervalWeight;
-	int32 m_numActiveChildren;
-	int16 m_beginIntervalIndex;
-	int16 m_endIntervalIndex;
-	bool m_initSync;
-	bool m_doSubtractiveBlend;
+  virtual ~hkbBlenderGenerator();
+  float m_referencePoseWeightThreshold;
+  float m_blendParameter;
+  float m_minCyclicBlendParameter;
+  float m_maxCyclicBlendParameter;
+  int16 m_indexOfSyncMasterChild;
+  int16 m_flags;
+  bool m_subtractLastChild;
+  hkArray<hkbBlenderGeneratorChild *> m_children;
+  hkArray<void> m_childrenInternalStates;
+  hkArray<void> m_sortedChildren;
+  float m_endIntervalWeight;
+  int32 m_numActiveChildren;
+  int16 m_beginIntervalIndex;
+  int16 m_endIntervalIndex;
+  bool m_initSync;
+  bool m_doSubtractiveBlend;
 };
 
-class hkbBlenderGeneratorChildInternalState
-{
+class hkbBlenderGeneratorChildInternalState {
 public:
-	bool m_isActive;
-	bool m_syncNextFrame;
+  bool m_isActive;
+  bool m_syncNextFrame;
 };
 
-class hkbBlenderGeneratorInternalState : public hkReferencedObject
-{
+class hkbBlenderGeneratorInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbBlenderGeneratorInternalState();
-	hkArray<hkbBlenderGeneratorChildInternalState> m_childrenInternalStates;
-	hkArray<int16> m_sortedChildren;
-	float m_endIntervalWeight;
-	int32 m_numActiveChildren;
-	int16 m_beginIntervalIndex;
-	int16 m_endIntervalIndex;
-	bool m_initSync;
-	bool m_doSubtractiveBlend;
+  virtual ~hkbBlenderGeneratorInternalState();
+  hkArray<hkbBlenderGeneratorChildInternalState> m_childrenInternalStates;
+  hkArray<int16> m_sortedChildren;
+  float m_endIntervalWeight;
+  int32 m_numActiveChildren;
+  int16 m_beginIntervalIndex;
+  int16 m_endIntervalIndex;
+  bool m_initSync;
+  bool m_doSubtractiveBlend;
 };
 
-class hkbTransitionEffect : public hkbGenerator
-{
+class hkbTransitionEffect : public hkbGenerator {
 public:
-	int8 m_selfTransitionMode;
-	int8 m_eventMode;
-	int8 m_defaultEventMode;
+  int8 m_selfTransitionMode;
+  int8 m_eventMode;
+  int8 m_defaultEventMode;
 };
 
-class hkbBlendingTransitionEffect : public hkbTransitionEffect
-{
+class hkbBlendingTransitionEffect : public hkbTransitionEffect {
 public:
-	virtual ~hkbBlendingTransitionEffect();
-	float m_duration;
-	float m_toGeneratorStartTimeFraction;
-	hkFlags m_flags;
-	int8 m_endMode;
-	int8 m_blendCurve;
-	void *m_fromGenerator;
-	void *m_toGenerator;
-	hkArray<void> m_characterPoseAtBeginningOfTransition;
-	float m_timeRemaining;
-	float m_timeInTransition;
-	bool m_applySelfTransition;
-	bool m_initializeCharacterPose;
+  virtual ~hkbBlendingTransitionEffect();
+  float m_duration;
+  float m_toGeneratorStartTimeFraction;
+  hkFlags m_flags;
+  int8 m_endMode;
+  int8 m_blendCurve;
+  void *m_fromGenerator;
+  void *m_toGenerator;
+  hkArray<void> m_characterPoseAtBeginningOfTransition;
+  float m_timeRemaining;
+  float m_timeInTransition;
+  bool m_applySelfTransition;
+  bool m_initializeCharacterPose;
 };
 
-class hkbBlendingTransitionEffectInternalState : public hkReferencedObject
-{
+class hkbBlendingTransitionEffectInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbBlendingTransitionEffectInternalState();
-	hkArray<hkQsTransform> m_characterPoseAtBeginningOfTransition;
-	float m_timeRemaining;
-	float m_timeInTransition;
-	bool m_applySelfTransition;
-	bool m_initializeCharacterPose;
+  virtual ~hkbBlendingTransitionEffectInternalState();
+  hkArray<hkQsTransform> m_characterPoseAtBeginningOfTransition;
+  float m_timeRemaining;
+  float m_timeInTransition;
+  bool m_applySelfTransition;
+  bool m_initializeCharacterPose;
 };
 
-class hkbBoneIndexArray : public hkbBindable
-{
+class hkbBoneIndexArray : public hkbBindable {
 public:
-	virtual ~hkbBoneIndexArray();
-	hkArray<int16> m_boneIndices;
+  virtual ~hkbBoneIndexArray();
+  hkArray<int16> m_boneIndices;
 };
 
-class hkbBoolVariableSequencedDataSample
-{
+class hkbBoolVariableSequencedDataSample {
 public:
-	float m_time;
-	bool m_value;
+  float m_time;
+  bool m_value;
 };
 
-class hkbSequencedData : public hkReferencedObject
-{
+class hkbSequencedData : public hkReferencedObject {
 public:
 };
 
-class hkbBoolVariableSequencedData : public hkbSequencedData
-{
+class hkbBoolVariableSequencedData : public hkbSequencedData {
 public:
-	virtual ~hkbBoolVariableSequencedData();
-	hkArray<hkbBoolVariableSequencedDataSample> m_samples;
-	int32 m_variableIndex;
+  virtual ~hkbBoolVariableSequencedData();
+  hkArray<hkbBoolVariableSequencedDataSample> m_samples;
+  int32 m_variableIndex;
 };
 
-class hkbCharacterControllerControlData
-{
+class hkbCharacterControllerControlData {
 public:
-	hkVector4 m_desiredVelocity;
-	float m_verticalGain;
-	float m_horizontalCatchUpGain;
-	float m_maxVerticalSeparation;
-	float m_maxHorizontalSeparation;
+  hkVector4 m_desiredVelocity;
+  float m_verticalGain;
+  float m_horizontalCatchUpGain;
+  float m_maxVerticalSeparation;
+  float m_maxHorizontalSeparation;
 };
 
-class hkbCharacterControllerModifier : public hkbModifier
-{
+class hkbCharacterControllerModifier : public hkbModifier {
 public:
-	virtual ~hkbCharacterControllerModifier();
-	hkbCharacterControllerControlData m_controlData;
-	hkVector4 m_initialVelocity;
-	int8 m_initialVelocityCoordinates;
-	int8 m_motionMode;
-	bool m_forceDownwardMomentum;
-	bool m_applyGravity;
-	bool m_setInitialVelocity;
-	bool m_isTouchingGround;
-	hkVector4 m_gravity;
-	float m_timestep;
-	bool m_isInitialVelocityAdded;
+  virtual ~hkbCharacterControllerModifier();
+  hkbCharacterControllerControlData m_controlData;
+  hkVector4 m_initialVelocity;
+  int8 m_initialVelocityCoordinates;
+  int8 m_motionMode;
+  bool m_forceDownwardMomentum;
+  bool m_applyGravity;
+  bool m_setInitialVelocity;
+  bool m_isTouchingGround;
+  hkVector4 m_gravity;
+  float m_timestep;
+  bool m_isInitialVelocityAdded;
 };
 
-class hkbCharacterControllerModifierInternalState : public hkReferencedObject
-{
+class hkbCharacterControllerModifierInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbCharacterControllerModifierInternalState();
-	hkVector4 m_gravity;
-	float m_timestep;
-	bool m_isInitialVelocityAdded;
-	bool m_isTouchingGround;
+  virtual ~hkbCharacterControllerModifierInternalState();
+  hkVector4 m_gravity;
+  float m_timestep;
+  bool m_isInitialVelocityAdded;
+  bool m_isTouchingGround;
 };
 
-class hkbClipTrigger
-{
+class hkbClipTrigger {
 public:
-	float m_localTime;
-	hkbEventProperty m_event;
-	bool m_relativeToEndOfClip;
-	bool m_acyclic;
-	bool m_isAnnotation;
+  float m_localTime;
+  hkbEventProperty m_event;
+  bool m_relativeToEndOfClip;
+  bool m_acyclic;
+  bool m_isAnnotation;
 };
 
-class hkbClipTriggerArray : public hkReferencedObject
-{
+class hkbClipTriggerArray : public hkReferencedObject {
 public:
-	virtual ~hkbClipTriggerArray();
-	hkArray<hkbClipTrigger> m_triggers;
+  virtual ~hkbClipTriggerArray();
+  hkArray<hkbClipTrigger> m_triggers;
 };
 
-class hkbClipGenerator : public hkbGenerator
-{
+class hkbClipGenerator : public hkbGenerator {
 public:
-	virtual ~hkbClipGenerator();
-	hkStringPtr m_animationName;
-	hkbClipTriggerArray *m_triggers;
-	float m_cropStartAmountLocalTime;
-	float m_cropEndAmountLocalTime;
-	float m_startTime;
-	float m_playbackSpeed;
-	float m_enforcedDuration;
-	float m_userControlledTimeFraction;
-	int16 m_animationBindingIndex;
-	int8 m_mode;
-	int8 m_flags;
-	hkArray<void> m_animDatas;
-	void *m_animationControl;
-	void *m_originalTriggers;
-	void *m_mapperData;
-	void *m_binding;
-	void *m_mirroredAnimation;
-	hkQsTransform m_extractedMotion;
-	hkArray<void> m_echos;
-	float m_localTime;
-	float m_time;
-	float m_previousUserControlledTimeFraction;
-	int32 m_bufferSize;
-	int32 m_echoBufferSize;
-	bool m_atEnd;
-	bool m_ignoreStartTime;
-	bool m_pingPongBackward;
+  virtual ~hkbClipGenerator();
+  hkStringPtr m_animationName;
+  hkbClipTriggerArray *m_triggers;
+  float m_cropStartAmountLocalTime;
+  float m_cropEndAmountLocalTime;
+  float m_startTime;
+  float m_playbackSpeed;
+  float m_enforcedDuration;
+  float m_userControlledTimeFraction;
+  int16 m_animationBindingIndex;
+  int8 m_mode;
+  int8 m_flags;
+  hkArray<void> m_animDatas;
+  void *m_animationControl;
+  void *m_originalTriggers;
+  void *m_mapperData;
+  void *m_binding;
+  void *m_mirroredAnimation;
+  hkQsTransform m_extractedMotion;
+  hkArray<void> m_echos;
+  float m_localTime;
+  float m_time;
+  float m_previousUserControlledTimeFraction;
+  int32 m_bufferSize;
+  int32 m_echoBufferSize;
+  bool m_atEnd;
+  bool m_ignoreStartTime;
+  bool m_pingPongBackward;
 };
 
-class hkbClipGeneratorEcho
-{
+class hkbClipGeneratorEcho {
 public:
-	float m_offsetLocalTime;
-	float m_weight;
-	float m_dwdt;
+  float m_offsetLocalTime;
+  float m_weight;
+  float m_dwdt;
 };
 
-class hkbClipGeneratorInternalState : public hkReferencedObject
-{
+class hkbClipGeneratorInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbClipGeneratorInternalState();
-	hkQsTransform m_extractedMotion;
-	hkArray<hkbClipGeneratorEcho> m_echos;
-	float m_localTime;
-	float m_time;
-	float m_previousUserControlledTimeFraction;
-	int32 m_bufferSize;
-	int32 m_echoBufferSize;
-	bool m_atEnd;
-	bool m_ignoreStartTime;
-	bool m_pingPongBackward;
+  virtual ~hkbClipGeneratorInternalState();
+  hkQsTransform m_extractedMotion;
+  hkArray<hkbClipGeneratorEcho> m_echos;
+  float m_localTime;
+  float m_time;
+  float m_previousUserControlledTimeFraction;
+  int32 m_bufferSize;
+  int32 m_echoBufferSize;
+  bool m_atEnd;
+  bool m_ignoreStartTime;
+  bool m_pingPongBackward;
 };
 
-class hkbCombineTransformsModifier : public hkbModifier
-{
+class hkbCombineTransformsModifier : public hkbModifier {
 public:
-	virtual ~hkbCombineTransformsModifier();
-	hkVector4 m_translationOut;
-	hkQuaternion m_rotationOut;
-	hkVector4 m_leftTranslation;
-	hkQuaternion m_leftRotation;
-	hkVector4 m_rightTranslation;
-	hkQuaternion m_rightRotation;
-	bool m_invertLeftTransform;
-	bool m_invertRightTransform;
-	bool m_invertResult;
+  virtual ~hkbCombineTransformsModifier();
+  hkVector4 m_translationOut;
+  hkQuaternion m_rotationOut;
+  hkVector4 m_leftTranslation;
+  hkQuaternion m_leftRotation;
+  hkVector4 m_rightTranslation;
+  hkQuaternion m_rightRotation;
+  bool m_invertLeftTransform;
+  bool m_invertRightTransform;
+  bool m_invertResult;
 };
 
-class hkbCombineTransformsModifierInternalState : public hkReferencedObject
-{
+class hkbCombineTransformsModifierInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbCombineTransformsModifierInternalState();
-	hkVector4 m_translationOut;
-	hkQuaternion m_rotationOut;
+  virtual ~hkbCombineTransformsModifierInternalState();
+  hkVector4 m_translationOut;
+  hkQuaternion m_rotationOut;
 };
 
-class hkbCompiledExpressionSetToken
-{
+class hkbCompiledExpressionSetToken {
 public:
-	float m_data;
-	int8 m_type;
-	int8 m_operator;
+  float m_data;
+  int8 m_type;
+  int8 m_operator;
 };
 
-class hkbCompiledExpressionSet : public hkReferencedObject
-{
+class hkbCompiledExpressionSet : public hkReferencedObject {
 public:
-	virtual ~hkbCompiledExpressionSet();
-	hkArray<hkbCompiledExpressionSetToken> m_rpn;
-	hkArray<int32> m_expressionToRpnIndex;
-	int8 m_numExpressions;
+  virtual ~hkbCompiledExpressionSet();
+  hkArray<hkbCompiledExpressionSetToken> m_rpn;
+  hkArray<int32> m_expressionToRpnIndex;
+  int8 m_numExpressions;
 };
 
-class hkbComputeDirectionModifier : public hkbModifier
-{
+class hkbComputeDirectionModifier : public hkbModifier {
 public:
-	virtual ~hkbComputeDirectionModifier();
-	hkVector4 m_pointIn;
-	hkVector4 m_pointOut;
-	float m_groundAngleOut;
-	float m_upAngleOut;
-	float m_verticalOffset;
-	bool m_reverseGroundAngle;
-	bool m_reverseUpAngle;
-	bool m_projectPoint;
-	bool m_normalizePoint;
-	bool m_computeOnlyOnce;
-	bool m_computedOutput;
+  virtual ~hkbComputeDirectionModifier();
+  hkVector4 m_pointIn;
+  hkVector4 m_pointOut;
+  float m_groundAngleOut;
+  float m_upAngleOut;
+  float m_verticalOffset;
+  bool m_reverseGroundAngle;
+  bool m_reverseUpAngle;
+  bool m_projectPoint;
+  bool m_normalizePoint;
+  bool m_computeOnlyOnce;
+  bool m_computedOutput;
 };
 
-class hkbComputeDirectionModifierInternalState : public hkReferencedObject
-{
+class hkbComputeDirectionModifierInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbComputeDirectionModifierInternalState();
-	hkVector4 m_pointOut;
-	float m_groundAngleOut;
-	float m_upAngleOut;
-	bool m_computedOutput;
+  virtual ~hkbComputeDirectionModifierInternalState();
+  hkVector4 m_pointOut;
+  float m_groundAngleOut;
+  float m_upAngleOut;
+  bool m_computedOutput;
 };
 
-class hkbComputeRotationFromAxisAngleModifier : public hkbModifier
-{
+class hkbComputeRotationFromAxisAngleModifier : public hkbModifier {
 public:
-	virtual ~hkbComputeRotationFromAxisAngleModifier();
-	hkQuaternion m_rotationOut;
-	hkVector4 m_axis;
-	float m_angleDegrees;
+  virtual ~hkbComputeRotationFromAxisAngleModifier();
+  hkQuaternion m_rotationOut;
+  hkVector4 m_axis;
+  float m_angleDegrees;
 };
 
-class hkbComputeRotationFromAxisAngleModifierInternalState : public hkReferencedObject
-{
+class hkbComputeRotationFromAxisAngleModifierInternalState
+    : public hkReferencedObject {
 public:
-	virtual ~hkbComputeRotationFromAxisAngleModifierInternalState();
-	hkQuaternion m_rotationOut;
+  virtual ~hkbComputeRotationFromAxisAngleModifierInternalState();
+  hkQuaternion m_rotationOut;
 };
 
-class hkbComputeRotationToTargetModifier : public hkbModifier
-{
+class hkbComputeRotationToTargetModifier : public hkbModifier {
 public:
-	virtual ~hkbComputeRotationToTargetModifier();
-	hkQuaternion m_rotationOut;
-	hkVector4 m_targetPosition;
-	hkVector4 m_currentPosition;
-	hkQuaternion m_currentRotation;
-	hkVector4 m_localAxisOfRotation;
-	hkVector4 m_localFacingDirection;
-	bool m_resultIsDelta;
+  virtual ~hkbComputeRotationToTargetModifier();
+  hkQuaternion m_rotationOut;
+  hkVector4 m_targetPosition;
+  hkVector4 m_currentPosition;
+  hkQuaternion m_currentRotation;
+  hkVector4 m_localAxisOfRotation;
+  hkVector4 m_localFacingDirection;
+  bool m_resultIsDelta;
 };
 
-class hkbComputeRotationToTargetModifierInternalState : public hkReferencedObject
-{
+class hkbComputeRotationToTargetModifierInternalState
+    : public hkReferencedObject {
 public:
-	virtual ~hkbComputeRotationToTargetModifierInternalState();
-	hkQuaternion m_rotationOut;
+  virtual ~hkbComputeRotationToTargetModifierInternalState();
+  hkQuaternion m_rotationOut;
 };
 
-class hkbDampingModifier : public hkbModifier
-{
+class hkbDampingModifier : public hkbModifier {
 public:
-	virtual ~hkbDampingModifier();
-	float m_kP;
-	float m_kI;
-	float m_kD;
-	bool m_enableScalarDamping;
-	bool m_enableVectorDamping;
-	float m_rawValue;
-	float m_dampedValue;
-	hkVector4 m_rawVector;
-	hkVector4 m_dampedVector;
-	hkVector4 m_vecErrorSum;
-	hkVector4 m_vecPreviousError;
-	float m_errorSum;
-	float m_previousError;
+  virtual ~hkbDampingModifier();
+  float m_kP;
+  float m_kI;
+  float m_kD;
+  bool m_enableScalarDamping;
+  bool m_enableVectorDamping;
+  float m_rawValue;
+  float m_dampedValue;
+  hkVector4 m_rawVector;
+  hkVector4 m_dampedVector;
+  hkVector4 m_vecErrorSum;
+  hkVector4 m_vecPreviousError;
+  float m_errorSum;
+  float m_previousError;
 };
 
-class hkbDampingModifierInternalState : public hkReferencedObject
-{
+class hkbDampingModifierInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbDampingModifierInternalState();
-	hkVector4 m_dampedVector;
-	hkVector4 m_vecErrorSum;
-	hkVector4 m_vecPreviousError;
-	float m_dampedValue;
-	float m_errorSum;
-	float m_previousError;
+  virtual ~hkbDampingModifierInternalState();
+  hkVector4 m_dampedVector;
+  hkVector4 m_vecErrorSum;
+  hkVector4 m_vecPreviousError;
+  float m_dampedValue;
+  float m_errorSum;
+  float m_previousError;
 };
 
-class hkbModifierWrapper : public hkbModifier
-{
+class hkbModifierWrapper : public hkbModifier {
 public:
-	virtual ~hkbModifierWrapper();
-	hkbModifier *m_modifier;
+  virtual ~hkbModifierWrapper();
+  hkbModifier *m_modifier;
 };
 
-class hkbDelayedModifier : public hkbModifierWrapper
-{
+class hkbDelayedModifier : public hkbModifierWrapper {
 public:
-	virtual ~hkbDelayedModifier();
-	float m_delaySeconds;
-	float m_durationSeconds;
-	float m_secondsElapsed;
-	bool m_isActive;
+  virtual ~hkbDelayedModifier();
+  float m_delaySeconds;
+  float m_durationSeconds;
+  float m_secondsElapsed;
+  bool m_isActive;
 };
 
-class hkbDelayedModifierInternalState : public hkReferencedObject
-{
+class hkbDelayedModifierInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbDelayedModifierInternalState();
-	float m_secondsElapsed;
-	bool m_isActive;
+  virtual ~hkbDelayedModifierInternalState();
+  float m_secondsElapsed;
+  bool m_isActive;
 };
 
-class hkbDetectCloseToGroundModifier : public hkbModifier
-{
+class hkbDetectCloseToGroundModifier : public hkbModifier {
 public:
-	virtual ~hkbDetectCloseToGroundModifier();
-	hkbEventProperty m_closeToGroundEvent;
-	float m_closeToGroundHeight;
-	float m_raycastDistanceDown;
-	uint32 m_collisionFilterInfo;
-	int16 m_boneIndex;
-	int16 m_animBoneIndex;
-	bool m_isCloseToGround;
+  virtual ~hkbDetectCloseToGroundModifier();
+  hkbEventProperty m_closeToGroundEvent;
+  float m_closeToGroundHeight;
+  float m_raycastDistanceDown;
+  uint32 m_collisionFilterInfo;
+  int16 m_boneIndex;
+  int16 m_animBoneIndex;
+  bool m_isCloseToGround;
 };
 
-class hkbDetectCloseToGroundModifierInternalState : public hkReferencedObject
-{
+class hkbDetectCloseToGroundModifierInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbDetectCloseToGroundModifierInternalState();
-	bool m_isCloseToGround;
+  virtual ~hkbDetectCloseToGroundModifierInternalState();
+  bool m_isCloseToGround;
 };
 
-class hkbExpressionData
-{
+class hkbExpressionData {
 public:
-	hkStringPtr m_expression;
-	int32 m_assignmentVariableIndex;
-	int32 m_assignmentEventIndex;
-	int8 m_eventMode;
-	bool m_raisedEvent;
-	bool m_wasTrueInPreviousFrame;
+  hkStringPtr m_expression;
+  int32 m_assignmentVariableIndex;
+  int32 m_assignmentEventIndex;
+  int8 m_eventMode;
+  bool m_raisedEvent;
+  bool m_wasTrueInPreviousFrame;
 };
 
-class hkbExpressionDataArray : public hkReferencedObject
-{
+class hkbExpressionDataArray : public hkReferencedObject {
 public:
-	virtual ~hkbExpressionDataArray();
-	hkArray<hkbExpressionData> m_expressionsData;
+  virtual ~hkbExpressionDataArray();
+  hkArray<hkbExpressionData> m_expressionsData;
 };
 
-class hkbEvaluateExpressionModifier : public hkbModifier
-{
+class hkbEvaluateExpressionModifier : public hkbModifier {
 public:
-	virtual ~hkbEvaluateExpressionModifier();
-	hkbExpressionDataArray *m_expressions;
-	void *m_compiledExpressionSet;
-	hkArray<void> m_internalExpressionsData;
+  virtual ~hkbEvaluateExpressionModifier();
+  hkbExpressionDataArray *m_expressions;
+  void *m_compiledExpressionSet;
+  hkArray<void> m_internalExpressionsData;
 };
 
-class hkbEvaluateExpressionModifierInternalExpressionData
-{
+class hkbEvaluateExpressionModifierInternalExpressionData {
 public:
-	bool m_raisedEvent;
-	bool m_wasTrueInPreviousFrame;
+  bool m_raisedEvent;
+  bool m_wasTrueInPreviousFrame;
 };
 
-class hkbEvaluateExpressionModifierInternalState : public hkReferencedObject
-{
+class hkbEvaluateExpressionModifierInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbEvaluateExpressionModifierInternalState();
-	hkArray<hkbEvaluateExpressionModifierInternalExpressionData> m_internalExpressionsData;
+  virtual ~hkbEvaluateExpressionModifierInternalState();
+  hkArray<hkbEvaluateExpressionModifierInternalExpressionData>
+      m_internalExpressionsData;
 };
 
-class hkbEvaluateHandleModifier : public hkbModifier
-{
+class hkbEvaluateHandleModifier : public hkbModifier {
 public:
-	virtual ~hkbEvaluateHandleModifier();
-	hkbHandle *m_handle;
-	hkVector4 m_handlePositionOut;
-	hkQuaternion m_handleRotationOut;
-	bool m_isValidOut;
-	float m_extrapolationTimeStep;
-	float m_handleChangeSpeed;
-	int8 m_handleChangeMode;
-	hkbHandle m_oldHandle;
-	hkVector4 m_oldHandlePosition;
-	hkQuaternion m_oldHandleRotation;
-	float m_timeSinceLastModify;
-	bool m_smoothlyChangingHandles;
+  virtual ~hkbEvaluateHandleModifier();
+  hkbHandle *m_handle;
+  hkVector4 m_handlePositionOut;
+  hkQuaternion m_handleRotationOut;
+  bool m_isValidOut;
+  float m_extrapolationTimeStep;
+  float m_handleChangeSpeed;
+  int8 m_handleChangeMode;
+  hkbHandle m_oldHandle;
+  hkVector4 m_oldHandlePosition;
+  hkQuaternion m_oldHandleRotation;
+  float m_timeSinceLastModify;
+  bool m_smoothlyChangingHandles;
 };
 
-class hkbEventDrivenModifier : public hkbModifierWrapper
-{
+class hkbEventDrivenModifier : public hkbModifierWrapper {
 public:
-	virtual ~hkbEventDrivenModifier();
-	int32 m_activateEventId;
-	int32 m_deactivateEventId;
-	bool m_activeByDefault;
-	bool m_isActive;
+  virtual ~hkbEventDrivenModifier();
+  int32 m_activateEventId;
+  int32 m_deactivateEventId;
+  bool m_activeByDefault;
+  bool m_isActive;
 };
 
-class hkbEventDrivenModifierInternalState : public hkReferencedObject
-{
+class hkbEventDrivenModifierInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbEventDrivenModifierInternalState();
-	bool m_isActive;
+  virtual ~hkbEventDrivenModifierInternalState();
+  bool m_isActive;
 };
 
-class hkbEventPayloadList : public hkbEventPayload
-{
+class hkbEventPayloadList : public hkbEventPayload {
 public:
-	virtual ~hkbEventPayloadList();
-	hkArray<hkbEventPayload *> m_payloads;
+  virtual ~hkbEventPayloadList();
+  hkArray<hkbEventPayload *> m_payloads;
 };
 
-class hkbEventRangeData
-{
+class hkbEventRangeData {
 public:
-	float m_upperBound;
-	hkbEventProperty m_event;
-	int8 m_eventMode;
+  float m_upperBound;
+  hkbEventProperty m_event;
+  int8 m_eventMode;
 };
 
-class hkbEventRangeDataArray : public hkReferencedObject
-{
+class hkbEventRangeDataArray : public hkReferencedObject {
 public:
-	virtual ~hkbEventRangeDataArray();
-	hkArray<hkbEventRangeData> m_eventData;
+  virtual ~hkbEventRangeDataArray();
+  hkArray<hkbEventRangeData> m_eventData;
 };
 
-class hkbEvent : public hkbEventBase
-{
+class hkbEvent : public hkbEventBase {
 public:
-	void *m_sender;
+  void *m_sender;
 };
 
-class hkbEventSequencedDataSequencedEvent
-{
+class hkbEventSequencedDataSequencedEvent {
 public:
-	hkbEvent m_event;
-	float m_time;
+  hkbEvent m_event;
+  float m_time;
 };
 
-class hkbEventSequencedData : public hkbSequencedData
-{
+class hkbEventSequencedData : public hkbSequencedData {
 public:
-	virtual ~hkbEventSequencedData();
-	hkArray<hkbEventSequencedDataSequencedEvent> m_events;
+  virtual ~hkbEventSequencedData();
+  hkArray<hkbEventSequencedDataSequencedEvent> m_events;
 };
 
-class hkbEventsFromRangeModifier : public hkbModifier
-{
+class hkbEventsFromRangeModifier : public hkbModifier {
 public:
-	virtual ~hkbEventsFromRangeModifier();
-	float m_inputValue;
-	float m_lowerBound;
-	hkbEventRangeDataArray *m_eventRanges;
-	hkArray<void> m_wasActiveInPreviousFrame;
+  virtual ~hkbEventsFromRangeModifier();
+  float m_inputValue;
+  float m_lowerBound;
+  hkbEventRangeDataArray *m_eventRanges;
+  hkArray<void> m_wasActiveInPreviousFrame;
 };
 
-class hkbEventsFromRangeModifierInternalState : public hkReferencedObject
-{
+class hkbEventsFromRangeModifierInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbEventsFromRangeModifierInternalState();
-	hkArray<bool> m_wasActiveInPreviousFrame;
+  virtual ~hkbEventsFromRangeModifierInternalState();
+  hkArray<bool> m_wasActiveInPreviousFrame;
 };
 
-class hkbCondition : public hkReferencedObject
-{
+class hkbCondition : public hkReferencedObject {
 public:
 };
 
-class hkbExpressionCondition : public hkbCondition
-{
+class hkbExpressionCondition : public hkbCondition {
 public:
-	virtual ~hkbExpressionCondition();
-	hkStringPtr m_expression;
-	void *m_compiledExpressionSet;
+  virtual ~hkbExpressionCondition();
+  hkStringPtr m_expression;
+  void *m_compiledExpressionSet;
 };
 
-class hkbExtractRagdollPoseModifier : public hkbModifier
-{
+class hkbExtractRagdollPoseModifier : public hkbModifier {
 public:
-	virtual ~hkbExtractRagdollPoseModifier();
-	int16 m_poseMatchingBone0;
-	int16 m_poseMatchingBone1;
-	int16 m_poseMatchingBone2;
-	bool m_enableComputeWorldFromModel;
+  virtual ~hkbExtractRagdollPoseModifier();
+  int16 m_poseMatchingBone0;
+  int16 m_poseMatchingBone1;
+  int16 m_poseMatchingBone2;
+  bool m_enableComputeWorldFromModel;
 };
 
-class hkbExtrapolatingTransitionEffect : public hkbBlendingTransitionEffect
-{
+class hkbExtrapolatingTransitionEffect : public hkbBlendingTransitionEffect {
 public:
-	virtual ~hkbExtrapolatingTransitionEffect();
-	hkbGeneratorSyncInfo m_fromGeneratorSyncInfo;
-	hkQsTransform m_worldFromModel;
-	hkQsTransform m_motion;
-	hkArray<void> m_pose;
-	hkArray<void> m_additivePose;
-	float m_toGeneratorDuration;
-	bool m_isFromGeneratorActive;
-	bool m_gotPose;
-	bool m_gotAdditivePose;
+  virtual ~hkbExtrapolatingTransitionEffect();
+  hkbGeneratorSyncInfo m_fromGeneratorSyncInfo;
+  hkQsTransform m_worldFromModel;
+  hkQsTransform m_motion;
+  hkArray<void> m_pose;
+  hkArray<void> m_additivePose;
+  float m_toGeneratorDuration;
+  bool m_isFromGeneratorActive;
+  bool m_gotPose;
+  bool m_gotAdditivePose;
 };
 
-class hkbExtrapolatingTransitionEffectInternalState : public hkReferencedObject
-{
+class hkbExtrapolatingTransitionEffectInternalState
+    : public hkReferencedObject {
 public:
-	virtual ~hkbExtrapolatingTransitionEffectInternalState();
-	hkbGeneratorSyncInfo m_fromGeneratorSyncInfo;
-	hkQsTransform m_worldFromModel;
-	hkQsTransform m_motion;
-	hkArray<hkQsTransform> m_pose;
-	hkArray<hkQsTransform> m_additivePose;
-	float m_toGeneratorDuration;
-	bool m_isFromGeneratorActive;
-	bool m_gotPose;
-	bool m_gotAdditivePose;
+  virtual ~hkbExtrapolatingTransitionEffectInternalState();
+  hkbGeneratorSyncInfo m_fromGeneratorSyncInfo;
+  hkQsTransform m_worldFromModel;
+  hkQsTransform m_motion;
+  hkArray<hkQsTransform> m_pose;
+  hkArray<hkQsTransform> m_additivePose;
+  float m_toGeneratorDuration;
+  bool m_isFromGeneratorActive;
+  bool m_gotPose;
+  bool m_gotAdditivePose;
 };
 
-class hkbFootIkGains
-{
+class hkbFootIkGains {
 public:
-	float m_onOffGain;
-	float m_groundAscendingGain;
-	float m_groundDescendingGain;
-	float m_footPlantedGain;
-	float m_footRaisedGain;
-	float m_footUnlockGain;
-	float m_worldFromModelFeedbackGain;
-	float m_errorUpDownBias;
-	float m_alignWorldFromModelGain;
-	float m_hipOrientationGain;
-	float m_maxKneeAngleDifference;
-	float m_ankleOrientationGain;
+  float m_onOffGain;
+  float m_groundAscendingGain;
+  float m_groundDescendingGain;
+  float m_footPlantedGain;
+  float m_footRaisedGain;
+  float m_footUnlockGain;
+  float m_worldFromModelFeedbackGain;
+  float m_errorUpDownBias;
+  float m_alignWorldFromModelGain;
+  float m_hipOrientationGain;
+  float m_maxKneeAngleDifference;
+  float m_ankleOrientationGain;
 };
 
-class hkbFootIkControlData
-{
+class hkbFootIkControlData {
 public:
-	hkbFootIkGains m_gains;
+  hkbFootIkGains m_gains;
 };
 
-class hkbFootIkControlsModifierLeg
-{
+class hkbFootIkControlsModifierLeg {
 public:
-	hkVector4 m_groundPosition;
-	hkbEventProperty m_ungroundedEvent;
-	float m_verticalError;
-	bool m_hitSomething;
-	bool m_isPlantedMS;
+  hkVector4 m_groundPosition;
+  hkbEventProperty m_ungroundedEvent;
+  float m_verticalError;
+  bool m_hitSomething;
+  bool m_isPlantedMS;
 };
 
-class hkbFootIkControlsModifier : public hkbModifier
-{
+class hkbFootIkControlsModifier : public hkbModifier {
 public:
-	virtual ~hkbFootIkControlsModifier();
-	hkbFootIkControlData m_controlData;
-	hkArray<hkbFootIkControlsModifierLeg> m_legs;
-	hkVector4 m_errorOutTranslation;
-	hkQuaternion m_alignWithGroundRotation;
+  virtual ~hkbFootIkControlsModifier();
+  hkbFootIkControlData m_controlData;
+  hkArray<hkbFootIkControlsModifierLeg> m_legs;
+  hkVector4 m_errorOutTranslation;
+  hkQuaternion m_alignWithGroundRotation;
 };
 
-class hkbFootIkModifierLeg
-{
+class hkbFootIkModifierLeg {
 public:
-	hkQsTransform m_originalAnkleTransformMS;
-	hkQuaternion m_prevAnkleRotLS;
-	hkVector4 m_kneeAxisLS;
-	hkVector4 m_footEndLS;
-	hkbEventProperty m_ungroundedEvent;
-	float m_footPlantedAnkleHeightMS;
-	float m_footRaisedAnkleHeightMS;
-	float m_maxAnkleHeightMS;
-	float m_minAnkleHeightMS;
-	float m_maxKneeAngleDegrees;
-	float m_minKneeAngleDegrees;
-	float m_verticalError;
-	float m_maxAnkleAngleDegrees;
-	int16 m_hipIndex;
-	int16 m_kneeIndex;
-	int16 m_ankleIndex;
-	bool m_hitSomething;
-	bool m_isPlantedMS;
-	bool m_isOriginalAnkleTransformMSSet;
+  hkQsTransform m_originalAnkleTransformMS;
+  hkQuaternion m_prevAnkleRotLS;
+  hkVector4 m_kneeAxisLS;
+  hkVector4 m_footEndLS;
+  hkbEventProperty m_ungroundedEvent;
+  float m_footPlantedAnkleHeightMS;
+  float m_footRaisedAnkleHeightMS;
+  float m_maxAnkleHeightMS;
+  float m_minAnkleHeightMS;
+  float m_maxKneeAngleDegrees;
+  float m_minKneeAngleDegrees;
+  float m_verticalError;
+  float m_maxAnkleAngleDegrees;
+  int16 m_hipIndex;
+  int16 m_kneeIndex;
+  int16 m_ankleIndex;
+  bool m_hitSomething;
+  bool m_isPlantedMS;
+  bool m_isOriginalAnkleTransformMSSet;
 };
 
-class hkbFootIkModifierInternalLegData
-{
+class hkbFootIkModifierInternalLegData {
 public:
-	hkVector4 m_groundPosition;
-	void *m_footIkSolver;
+  hkVector4 m_groundPosition;
+  void *m_footIkSolver;
 };
 
-class hkbFootIkModifier : public hkbModifier
-{
+class hkbFootIkModifier : public hkbModifier {
 public:
-	virtual ~hkbFootIkModifier();
-	hkbFootIkGains m_gains;
-	hkArray<hkbFootIkModifierLeg> m_legs;
-	float m_raycastDistanceUp;
-	float m_raycastDistanceDown;
-	float m_originalGroundHeightMS;
-	float m_errorOut;
-	hkVector4 m_errorOutTranslation;
-	hkQuaternion m_alignWithGroundRotation;
-	float m_verticalOffset;
-	uint32 m_collisionFilterInfo;
-	float m_forwardAlignFraction;
-	float m_sidewaysAlignFraction;
-	float m_sidewaysSampleWidth;
-	bool m_useTrackData;
-	bool m_lockFeetWhenPlanted;
-	bool m_useCharacterUpVector;
-	int8 m_alignMode;
-	hkArray<hkbFootIkModifierInternalLegData> m_internalLegData;
-	float m_prevIsFootIkEnabled;
-	bool m_isSetUp;
-	bool m_isGroundPositionValid;
-	float m_timeStep;
+  virtual ~hkbFootIkModifier();
+  hkbFootIkGains m_gains;
+  hkArray<hkbFootIkModifierLeg> m_legs;
+  float m_raycastDistanceUp;
+  float m_raycastDistanceDown;
+  float m_originalGroundHeightMS;
+  float m_errorOut;
+  hkVector4 m_errorOutTranslation;
+  hkQuaternion m_alignWithGroundRotation;
+  float m_verticalOffset;
+  uint32 m_collisionFilterInfo;
+  float m_forwardAlignFraction;
+  float m_sidewaysAlignFraction;
+  float m_sidewaysSampleWidth;
+  bool m_useTrackData;
+  bool m_lockFeetWhenPlanted;
+  bool m_useCharacterUpVector;
+  int8 m_alignMode;
+  hkArray<hkbFootIkModifierInternalLegData> m_internalLegData;
+  float m_prevIsFootIkEnabled;
+  bool m_isSetUp;
+  bool m_isGroundPositionValid;
+  float m_timeStep;
 };
 
-class hkbGeneratorTransitionEffect : public hkbTransitionEffect
-{
+class hkbGeneratorTransitionEffect : public hkbTransitionEffect {
 public:
-	virtual ~hkbGeneratorTransitionEffect();
-	hkbGenerator *m_transitionGenerator;
-	float m_blendInDuration;
-	float m_blendOutDuration;
-	bool m_syncToGeneratorStartTime;
-	void *m_fromGenerator;
-	void *m_toGenerator;
-	float m_timeInTransition;
-	float m_duration;
-	float m_effectiveBlendInDuration;
-	float m_effectiveBlendOutDuration;
-	int8 m_toGeneratorState;
-	bool m_echoTransitionGenerator;
-	bool m_echoToGenerator;
-	bool m_justActivated;
-	bool m_updateActiveNodes;
-	int8 m_stage;
+  virtual ~hkbGeneratorTransitionEffect();
+  hkbGenerator *m_transitionGenerator;
+  float m_blendInDuration;
+  float m_blendOutDuration;
+  bool m_syncToGeneratorStartTime;
+  void *m_fromGenerator;
+  void *m_toGenerator;
+  float m_timeInTransition;
+  float m_duration;
+  float m_effectiveBlendInDuration;
+  float m_effectiveBlendOutDuration;
+  int8 m_toGeneratorState;
+  bool m_echoTransitionGenerator;
+  bool m_echoToGenerator;
+  bool m_justActivated;
+  bool m_updateActiveNodes;
+  int8 m_stage;
 };
 
-class hkbGeneratorTransitionEffectInternalState : public hkReferencedObject
-{
+class hkbGeneratorTransitionEffectInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbGeneratorTransitionEffectInternalState();
-	float m_timeInTransition;
-	float m_duration;
-	float m_effectiveBlendInDuration;
-	float m_effectiveBlendOutDuration;
-	int8 m_toGeneratorState;
-	bool m_echoTransitionGenerator;
-	bool m_echoToGenerator;
-	bool m_justActivated;
-	bool m_updateActiveNodes;
-	int8 m_stage;
+  virtual ~hkbGeneratorTransitionEffectInternalState();
+  float m_timeInTransition;
+  float m_duration;
+  float m_effectiveBlendInDuration;
+  float m_effectiveBlendOutDuration;
+  int8 m_toGeneratorState;
+  bool m_echoTransitionGenerator;
+  bool m_echoToGenerator;
+  bool m_justActivated;
+  bool m_updateActiveNodes;
+  int8 m_stage;
 };
 
-class hkbGetHandleOnBoneModifier : public hkbModifier
-{
+class hkbGetHandleOnBoneModifier : public hkbModifier {
 public:
-	virtual ~hkbGetHandleOnBoneModifier();
-	hkbHandle *m_handleOut;
-	hkStringPtr m_localFrameName;
-	int16 m_ragdollBoneIndex;
-	int16 m_animationBoneIndex;
+  virtual ~hkbGetHandleOnBoneModifier();
+  hkbHandle *m_handleOut;
+  hkStringPtr m_localFrameName;
+  int16 m_ragdollBoneIndex;
+  int16 m_animationBoneIndex;
 };
 
-class hkbGetUpModifier : public hkbModifier
-{
+class hkbGetUpModifier : public hkbModifier {
 public:
-	virtual ~hkbGetUpModifier();
-	hkVector4 m_groundNormal;
-	float m_duration;
-	float m_alignWithGroundDuration;
-	int16 m_rootBoneIndex;
-	int16 m_otherBoneIndex;
-	int16 m_anotherBoneIndex;
-	float m_timeSinceBegin;
-	float m_timeStep;
-	bool m_initNextModify;
+  virtual ~hkbGetUpModifier();
+  hkVector4 m_groundNormal;
+  float m_duration;
+  float m_alignWithGroundDuration;
+  int16 m_rootBoneIndex;
+  int16 m_otherBoneIndex;
+  int16 m_anotherBoneIndex;
+  float m_timeSinceBegin;
+  float m_timeStep;
+  bool m_initNextModify;
 };
 
-class hkbGetUpModifierInternalState : public hkReferencedObject
-{
+class hkbGetUpModifierInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbGetUpModifierInternalState();
-	float m_timeSinceBegin;
-	float m_timeStep;
-	bool m_initNextModify;
+  virtual ~hkbGetUpModifierInternalState();
+  float m_timeSinceBegin;
+  float m_timeStep;
+  bool m_initNextModify;
 };
 
-class hkbGetWorldFromModelModifier : public hkbModifier
-{
+class hkbGetWorldFromModelModifier : public hkbModifier {
 public:
-	virtual ~hkbGetWorldFromModelModifier();
-	hkVector4 m_translationOut;
-	hkQuaternion m_rotationOut;
+  virtual ~hkbGetWorldFromModelModifier();
+  hkVector4 m_translationOut;
+  hkQuaternion m_rotationOut;
 };
 
-class hkbGetWorldFromModelModifierInternalState : public hkReferencedObject
-{
+class hkbGetWorldFromModelModifierInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbGetWorldFromModelModifierInternalState();
-	hkVector4 m_translationOut;
-	hkQuaternion m_rotationOut;
+  virtual ~hkbGetWorldFromModelModifierInternalState();
+  hkVector4 m_translationOut;
+  hkQuaternion m_rotationOut;
 };
 
-class hkbHandIkControlData
-{
+class hkbHandIkControlData {
 public:
-	hkVector4 m_targetPosition;
-	hkQuaternion m_targetRotation;
-	hkVector4 m_targetNormal;
-	hkbHandle *m_targetHandle;
-	float m_transformOnFraction;
-	float m_normalOnFraction;
-	float m_fadeInDuration;
-	float m_fadeOutDuration;
-	float m_extrapolationTimeStep;
-	float m_handleChangeSpeed;
-	int8 m_handleChangeMode;
-	bool m_fixUp;
+  hkVector4 m_targetPosition;
+  hkQuaternion m_targetRotation;
+  hkVector4 m_targetNormal;
+  hkbHandle *m_targetHandle;
+  float m_transformOnFraction;
+  float m_normalOnFraction;
+  float m_fadeInDuration;
+  float m_fadeOutDuration;
+  float m_extrapolationTimeStep;
+  float m_handleChangeSpeed;
+  int8 m_handleChangeMode;
+  bool m_fixUp;
 };
 
-class hkbHandIkControlsModifierHand
-{
+class hkbHandIkControlsModifierHand {
 public:
-	hkbHandIkControlData m_controlData;
-	int32 m_handIndex;
-	bool m_enable;
+  hkbHandIkControlData m_controlData;
+  int32 m_handIndex;
+  bool m_enable;
 };
 
-class hkbHandIkControlsModifier : public hkbModifier
-{
+class hkbHandIkControlsModifier : public hkbModifier {
 public:
-	virtual ~hkbHandIkControlsModifier();
-	hkArray<hkbHandIkControlsModifierHand> m_hands;
+  virtual ~hkbHandIkControlsModifier();
+  hkArray<hkbHandIkControlsModifierHand> m_hands;
 };
 
-class hkbHandIkModifierHand
-{
+class hkbHandIkModifierHand {
 public:
-	hkVector4 m_elbowAxisLS;
-	hkVector4 m_backHandNormalLS;
-	hkVector4 m_handOffsetLS;
-	hkQuaternion m_handOrienationOffsetLS;
-	float m_maxElbowAngleDegrees;
-	float m_minElbowAngleDegrees;
-	int16 m_shoulderIndex;
-	int16 m_shoulderSiblingIndex;
-	int16 m_elbowIndex;
-	int16 m_elbowSiblingIndex;
-	int16 m_wristIndex;
-	bool m_enforceEndPosition;
-	bool m_enforceEndRotation;
-	hkStringPtr m_localFrameName;
+  hkVector4 m_elbowAxisLS;
+  hkVector4 m_backHandNormalLS;
+  hkVector4 m_handOffsetLS;
+  hkQuaternion m_handOrienationOffsetLS;
+  float m_maxElbowAngleDegrees;
+  float m_minElbowAngleDegrees;
+  int16 m_shoulderIndex;
+  int16 m_shoulderSiblingIndex;
+  int16 m_elbowIndex;
+  int16 m_elbowSiblingIndex;
+  int16 m_wristIndex;
+  bool m_enforceEndPosition;
+  bool m_enforceEndRotation;
+  hkStringPtr m_localFrameName;
 };
 
-class hkbHandIkModifier : public hkbModifier
-{
+class hkbHandIkModifier : public hkbModifier {
 public:
-	virtual ~hkbHandIkModifier();
-	hkArray<hkbHandIkModifierHand> m_hands;
-	int8 m_fadeInOutCurve;
-	hkArray<void> m_internalHandData;
+  virtual ~hkbHandIkModifier();
+  hkArray<hkbHandIkModifierHand> m_hands;
+  int8 m_fadeInOutCurve;
+  hkArray<void> m_internalHandData;
 };
 
-class hkbIntEventPayload : public hkbEventPayload
-{
+class hkbIntEventPayload : public hkbEventPayload {
 public:
-	virtual ~hkbIntEventPayload();
-	int32 m_data;
+  virtual ~hkbIntEventPayload();
+  int32 m_data;
 };
 
-class hkbIntVariableSequencedDataSample
-{
+class hkbIntVariableSequencedDataSample {
 public:
-	float m_time;
-	int32 m_value;
+  float m_time;
+  int32 m_value;
 };
 
-class hkbIntVariableSequencedData : public hkbSequencedData
-{
+class hkbIntVariableSequencedData : public hkbSequencedData {
 public:
-	virtual ~hkbIntVariableSequencedData();
-	hkArray<hkbIntVariableSequencedDataSample> m_samples;
-	int32 m_variableIndex;
+  virtual ~hkbIntVariableSequencedData();
+  hkArray<hkbIntVariableSequencedDataSample> m_samples;
+  int32 m_variableIndex;
 };
 
-class hkbJigglerGroup : public hkbBindable
-{
+class hkbJigglerGroup : public hkbBindable {
 public:
-	virtual ~hkbJigglerGroup();
-	hkbBoneIndexArray *m_boneIndices;
-	float m_mass;
-	float m_stiffness;
-	float m_damping;
-	float m_maxElongation;
-	float m_maxCompression;
-	bool m_propagateToChildren;
-	bool m_affectSiblings;
-	bool m_rotateBonesForSkinning;
-	bool m_pad;
+  virtual ~hkbJigglerGroup();
+  hkbBoneIndexArray *m_boneIndices;
+  float m_mass;
+  float m_stiffness;
+  float m_damping;
+  float m_maxElongation;
+  float m_maxCompression;
+  bool m_propagateToChildren;
+  bool m_affectSiblings;
+  bool m_rotateBonesForSkinning;
+  bool m_pad;
 };
 
-class hkbJigglerModifier : public hkbModifier
-{
+class hkbJigglerModifier : public hkbModifier {
 public:
-	virtual ~hkbJigglerModifier();
-	hkArray<hkbJigglerGroup *> m_jigglerGroups;
-	int8 m_jiggleCoordinates;
-	hkArray<void> m_currentVelocitiesWS;
-	hkArray<void> m_currentPositions;
-	float m_timeStep;
-	bool m_initNextModify;
+  virtual ~hkbJigglerModifier();
+  hkArray<hkbJigglerGroup *> m_jigglerGroups;
+  int8 m_jiggleCoordinates;
+  hkArray<void> m_currentVelocitiesWS;
+  hkArray<void> m_currentPositions;
+  float m_timeStep;
+  bool m_initNextModify;
 };
 
-class hkbJigglerModifierInternalState : public hkReferencedObject
-{
+class hkbJigglerModifierInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbJigglerModifierInternalState();
-	hkArray<hkVector4> m_currentVelocitiesWS;
-	hkArray<hkVector4> m_currentPositions;
-	float m_timeStep;
-	bool m_initNextModify;
+  virtual ~hkbJigglerModifierInternalState();
+  hkArray<hkVector4> m_currentVelocitiesWS;
+  hkArray<hkVector4> m_currentPositions;
+  float m_timeStep;
+  bool m_initNextModify;
 };
 
-class hkbKeyframeBonesModifierKeyframeInfo
-{
+class hkbKeyframeBonesModifierKeyframeInfo {
 public:
-	hkVector4 m_keyframedPosition;
-	hkQuaternion m_keyframedRotation;
-	int16 m_boneIndex;
-	bool m_isValid;
+  hkVector4 m_keyframedPosition;
+  hkQuaternion m_keyframedRotation;
+  int16 m_boneIndex;
+  bool m_isValid;
 };
 
-class hkbKeyframeBonesModifier : public hkbModifier
-{
+class hkbKeyframeBonesModifier : public hkbModifier {
 public:
-	virtual ~hkbKeyframeBonesModifier();
-	hkArray<hkbKeyframeBonesModifierKeyframeInfo> m_keyframeInfo;
-	hkbBoneIndexArray *m_keyframedBonesList;
+  virtual ~hkbKeyframeBonesModifier();
+  hkArray<hkbKeyframeBonesModifierKeyframeInfo> m_keyframeInfo;
+  hkbBoneIndexArray *m_keyframedBonesList;
 };
 
-class hkbLookAtModifier : public hkbModifier
-{
+class hkbLookAtModifier : public hkbModifier {
 public:
-	virtual ~hkbLookAtModifier();
-	hkVector4 m_targetWS;
-	hkVector4 m_headForwardLS;
-	hkVector4 m_neckForwardLS;
-	hkVector4 m_neckRightLS;
-	hkVector4 m_eyePositionHS;
-	float m_newTargetGain;
-	float m_onGain;
-	float m_offGain;
-	float m_limitAngleDegrees;
-	float m_limitAngleLeft;
-	float m_limitAngleRight;
-	float m_limitAngleUp;
-	float m_limitAngleDown;
-	int16 m_headIndex;
-	int16 m_neckIndex;
-	bool m_isOn;
-	bool m_individualLimitsOn;
-	bool m_isTargetInsideLimitCone;
-	hkVector4 m_lookAtLastTargetWS;
-	float m_lookAtWeight;
+  virtual ~hkbLookAtModifier();
+  hkVector4 m_targetWS;
+  hkVector4 m_headForwardLS;
+  hkVector4 m_neckForwardLS;
+  hkVector4 m_neckRightLS;
+  hkVector4 m_eyePositionHS;
+  float m_newTargetGain;
+  float m_onGain;
+  float m_offGain;
+  float m_limitAngleDegrees;
+  float m_limitAngleLeft;
+  float m_limitAngleRight;
+  float m_limitAngleUp;
+  float m_limitAngleDown;
+  int16 m_headIndex;
+  int16 m_neckIndex;
+  bool m_isOn;
+  bool m_individualLimitsOn;
+  bool m_isTargetInsideLimitCone;
+  hkVector4 m_lookAtLastTargetWS;
+  float m_lookAtWeight;
 };
 
-class hkbLookAtModifierInternalState : public hkReferencedObject
-{
+class hkbLookAtModifierInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbLookAtModifierInternalState();
-	hkVector4 m_lookAtLastTargetWS;
-	float m_lookAtWeight;
-	bool m_isTargetInsideLimitCone;
+  virtual ~hkbLookAtModifierInternalState();
+  hkVector4 m_lookAtLastTargetWS;
+  float m_lookAtWeight;
+  bool m_isTargetInsideLimitCone;
 };
 
-class hkbManualSelectorGenerator : public hkbGenerator
-{
+class hkbManualSelectorGenerator : public hkbGenerator {
 public:
-	virtual ~hkbManualSelectorGenerator();
-	hkArray<hkbGenerator *> m_generators;
-	int8 m_selectedGeneratorIndex;
-	int8 m_currentGeneratorIndex;
+  virtual ~hkbManualSelectorGenerator();
+  hkArray<hkbGenerator *> m_generators;
+  int8 m_selectedGeneratorIndex;
+  int8 m_currentGeneratorIndex;
 };
 
-class hkbManualSelectorGeneratorInternalState : public hkReferencedObject
-{
+class hkbManualSelectorGeneratorInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbManualSelectorGeneratorInternalState();
-	int8 m_currentGeneratorIndex;
+  virtual ~hkbManualSelectorGeneratorInternalState();
+  int8 m_currentGeneratorIndex;
 };
 
-class hkbMirrorModifier : public hkbModifier
-{
+class hkbMirrorModifier : public hkbModifier {
 public:
-	virtual ~hkbMirrorModifier();
-	bool m_isAdditive;
+  virtual ~hkbMirrorModifier();
+  bool m_isAdditive;
 };
 
-class hkbModifierGenerator : public hkbGenerator
-{
+class hkbModifierGenerator : public hkbGenerator {
 public:
-	virtual ~hkbModifierGenerator();
-	hkbModifier *m_modifier;
-	hkbGenerator *m_generator;
+  virtual ~hkbModifierGenerator();
+  hkbModifier *m_modifier;
+  hkbGenerator *m_generator;
 };
 
-class hkbModifierList : public hkbModifier
-{
+class hkbModifierList : public hkbModifier {
 public:
-	virtual ~hkbModifierList();
-	hkArray<hkbModifier *> m_modifiers;
+  virtual ~hkbModifierList();
+  hkArray<hkbModifier *> m_modifiers;
 };
 
-class hkbMoveCharacterModifier : public hkbModifier
-{
+class hkbMoveCharacterModifier : public hkbModifier {
 public:
-	virtual ~hkbMoveCharacterModifier();
-	hkVector4 m_offsetPerSecondMS;
-	float m_timeSinceLastModify;
+  virtual ~hkbMoveCharacterModifier();
+  hkVector4 m_offsetPerSecondMS;
+  float m_timeSinceLastModify;
 };
 
-class hkbMoveCharacterModifierInternalState : public hkReferencedObject
-{
+class hkbMoveCharacterModifierInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbMoveCharacterModifierInternalState();
-	float m_timeSinceLastModify;
+  virtual ~hkbMoveCharacterModifierInternalState();
+  float m_timeSinceLastModify;
 };
 
-class hkbNamedEventPayload : public hkbEventPayload
-{
+class hkbNamedEventPayload : public hkbEventPayload {
 public:
-	virtual ~hkbNamedEventPayload();
-	hkStringPtr m_name;
+  virtual ~hkbNamedEventPayload();
+  hkStringPtr m_name;
 };
 
-class hkbNamedIntEventPayload : public hkbNamedEventPayload
-{
+class hkbNamedIntEventPayload : public hkbNamedEventPayload {
 public:
-	virtual ~hkbNamedIntEventPayload();
-	int32 m_data;
+  virtual ~hkbNamedIntEventPayload();
+  int32 m_data;
 };
 
-class hkbNamedRealEventPayload : public hkbNamedEventPayload
-{
+class hkbNamedRealEventPayload : public hkbNamedEventPayload {
 public:
-	virtual ~hkbNamedRealEventPayload();
-	float m_data;
+  virtual ~hkbNamedRealEventPayload();
+  float m_data;
 };
 
-class hkbNamedStringEventPayload : public hkbNamedEventPayload
-{
+class hkbNamedStringEventPayload : public hkbNamedEventPayload {
 public:
-	virtual ~hkbNamedStringEventPayload();
-	hkStringPtr m_data;
+  virtual ~hkbNamedStringEventPayload();
+  hkStringPtr m_data;
 };
 
-class hkbPoseMatchingGenerator : public hkbBlenderGenerator
-{
+class hkbPoseMatchingGenerator : public hkbBlenderGenerator {
 public:
-	virtual ~hkbPoseMatchingGenerator();
-	hkQuaternion m_worldFromModelRotation;
-	float m_blendSpeed;
-	float m_minSpeedToSwitch;
-	float m_minSwitchTimeNoError;
-	float m_minSwitchTimeFullError;
-	int32 m_startPlayingEventId;
-	int32 m_startMatchingEventId;
-	int16 m_rootBoneIndex;
-	int16 m_otherBoneIndex;
-	int16 m_anotherBoneIndex;
-	int16 m_pelvisIndex;
-	int8 m_mode;
-	int32 m_currentMatch;
-	int32 m_bestMatch;
-	float m_timeSinceBetterMatch;
-	float m_error;
-	bool m_resetCurrentMatchLocalTime;
-	void *m_poseMatchingUtility;
+  virtual ~hkbPoseMatchingGenerator();
+  hkQuaternion m_worldFromModelRotation;
+  float m_blendSpeed;
+  float m_minSpeedToSwitch;
+  float m_minSwitchTimeNoError;
+  float m_minSwitchTimeFullError;
+  int32 m_startPlayingEventId;
+  int32 m_startMatchingEventId;
+  int16 m_rootBoneIndex;
+  int16 m_otherBoneIndex;
+  int16 m_anotherBoneIndex;
+  int16 m_pelvisIndex;
+  int8 m_mode;
+  int32 m_currentMatch;
+  int32 m_bestMatch;
+  float m_timeSinceBetterMatch;
+  float m_error;
+  bool m_resetCurrentMatchLocalTime;
+  void *m_poseMatchingUtility;
 };
 
-class hkbPoseMatchingGeneratorInternalState : public hkReferencedObject
-{
+class hkbPoseMatchingGeneratorInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbPoseMatchingGeneratorInternalState();
-	int32 m_currentMatch;
-	int32 m_bestMatch;
-	float m_timeSinceBetterMatch;
-	float m_error;
-	bool m_resetCurrentMatchLocalTime;
+  virtual ~hkbPoseMatchingGeneratorInternalState();
+  int32 m_currentMatch;
+  int32 m_bestMatch;
+  float m_timeSinceBetterMatch;
+  float m_error;
+  bool m_resetCurrentMatchLocalTime;
 };
 
-class hkbRegisteredGenerator : public hkbBindable
-{
+class hkbRegisteredGenerator : public hkbBindable {
 public:
-	virtual ~hkbRegisteredGenerator();
-	hkbGenerator *m_generator;
-	hkVector4 m_relativePosition;
-	hkVector4 m_relativeDirection;
+  virtual ~hkbRegisteredGenerator();
+  hkbGenerator *m_generator;
+  hkVector4 m_relativePosition;
+  hkVector4 m_relativeDirection;
 };
 
-class hkbPositionRelativeSelectorGenerator : public hkbGenerator
-{
+class hkbPositionRelativeSelectorGenerator : public hkbGenerator {
 public:
-	virtual ~hkbPositionRelativeSelectorGenerator();
-	hkArray<hkbRegisteredGenerator *> m_registeredGenerators;
-	hkbGenerator *m_blendToFixPositionGenerator;
-	bool m_autoComputeEntryPoints;
-	float m_transitionTime;
-	bool m_useCharacterForward;
-	hkVector4 m_characterForward;
-	hkVector4 m_targetPosition;
-	hkQuaternion m_targetRotation;
-	float m_positionTolerance;
-	float m_fixPositionTolerance;
-	hkbEventProperty m_fixPositionEvent;
-	int32 m_endFixPositionEventId;
-	bool m_useManualSelection;
-	int8 m_selectedGeneratorIndex;
-	hkVector4 m_entryPosition;
-	hkVector4 m_entryForward;
-	hkVector4 m_lastTargetPos;
-	hkQuaternion m_lastTargetRot;
-	hkVector4 m_targetLinearDisp;
-	hkQuaternion m_targetAngularDisp;
-	float m_clipTime;
-	int8 m_currentGeneratorIndex;
-	bool m_usingBlendToFixPositionGenerator;
-	bool m_doLeadInFixup;
+  virtual ~hkbPositionRelativeSelectorGenerator();
+  hkArray<hkbRegisteredGenerator *> m_registeredGenerators;
+  hkbGenerator *m_blendToFixPositionGenerator;
+  bool m_autoComputeEntryPoints;
+  float m_transitionTime;
+  bool m_useCharacterForward;
+  hkVector4 m_characterForward;
+  hkVector4 m_targetPosition;
+  hkQuaternion m_targetRotation;
+  float m_positionTolerance;
+  float m_fixPositionTolerance;
+  hkbEventProperty m_fixPositionEvent;
+  int32 m_endFixPositionEventId;
+  bool m_useManualSelection;
+  int8 m_selectedGeneratorIndex;
+  hkVector4 m_entryPosition;
+  hkVector4 m_entryForward;
+  hkVector4 m_lastTargetPos;
+  hkQuaternion m_lastTargetRot;
+  hkVector4 m_targetLinearDisp;
+  hkQuaternion m_targetAngularDisp;
+  float m_clipTime;
+  int8 m_currentGeneratorIndex;
+  bool m_usingBlendToFixPositionGenerator;
+  bool m_doLeadInFixup;
 };
 
-class hkbPositionRelativeSelectorGeneratorInternalState : public hkReferencedObject
-{
+class hkbPositionRelativeSelectorGeneratorInternalState
+    : public hkReferencedObject {
 public:
-	virtual ~hkbPositionRelativeSelectorGeneratorInternalState();
-	hkVector4 m_entryPosition;
-	hkVector4 m_entryForward;
-	hkVector4 m_lastTargetPos;
-	hkQuaternion m_lastTargetRot;
-	hkVector4 m_targetLinearDisp;
-	hkQuaternion m_targetAngularDisp;
-	float m_clipTime;
-	int8 m_currentGeneratorIndex;
-	bool m_usingBlendToFixPositionGenerator;
-	bool m_doLeadInFixup;
+  virtual ~hkbPositionRelativeSelectorGeneratorInternalState();
+  hkVector4 m_entryPosition;
+  hkVector4 m_entryForward;
+  hkVector4 m_lastTargetPos;
+  hkQuaternion m_lastTargetRot;
+  hkVector4 m_targetLinearDisp;
+  hkQuaternion m_targetAngularDisp;
+  float m_clipTime;
+  int8 m_currentGeneratorIndex;
+  bool m_usingBlendToFixPositionGenerator;
+  bool m_doLeadInFixup;
 };
 
-class hkbPoweredRagdollControlData
-{
+class hkbPoweredRagdollControlData {
 public:
-	float m_maxForce;
-	float m_tau;
-	float m_damping;
-	float m_proportionalRecoveryVelocity;
-	float m_constantRecoveryVelocity;
+  float m_maxForce;
+  float m_tau;
+  float m_damping;
+  float m_proportionalRecoveryVelocity;
+  float m_constantRecoveryVelocity;
 };
 
-class hkbWorldFromModelModeData
-{
+class hkbWorldFromModelModeData {
 public:
-	int16 m_poseMatchingBone0;
-	int16 m_poseMatchingBone1;
-	int16 m_poseMatchingBone2;
-	int8 m_mode;
+  int16 m_poseMatchingBone0;
+  int16 m_poseMatchingBone1;
+  int16 m_poseMatchingBone2;
+  int8 m_mode;
 };
 
-class hkbPoweredRagdollControlsModifier : public hkbModifier
-{
+class hkbPoweredRagdollControlsModifier : public hkbModifier {
 public:
-	virtual ~hkbPoweredRagdollControlsModifier();
-	hkbPoweredRagdollControlData m_controlData;
-	hkbBoneIndexArray *m_bones;
-	hkbWorldFromModelModeData m_worldFromModelModeData;
-	hkbBoneWeightArray *m_boneWeights;
+  virtual ~hkbPoweredRagdollControlsModifier();
+  hkbPoweredRagdollControlData m_controlData;
+  hkbBoneIndexArray *m_bones;
+  hkbWorldFromModelModeData m_worldFromModelModeData;
+  hkbBoneWeightArray *m_boneWeights;
 };
 
-class hkbProxyModifierProxyInfo
-{
+class hkbProxyModifierProxyInfo {
 public:
-	float m_dynamicFriction;
-	float m_staticFriction;
-	float m_keepContactTolerance;
-	hkVector4 m_up;
-	float m_keepDistance;
-	float m_contactAngleSensitivity;
-	uint32 m_userPlanes;
-	float m_maxCharacterSpeedForSolver;
-	float m_characterStrength;
-	float m_characterMass;
-	float m_maxSlope;
-	float m_penetrationRecoverySpeed;
-	int32 m_maxCastIterations;
-	bool m_refreshManifoldInCheckSupport;
+  float m_dynamicFriction;
+  float m_staticFriction;
+  float m_keepContactTolerance;
+  hkVector4 m_up;
+  float m_keepDistance;
+  float m_contactAngleSensitivity;
+  uint32 m_userPlanes;
+  float m_maxCharacterSpeedForSolver;
+  float m_characterStrength;
+  float m_characterMass;
+  float m_maxSlope;
+  float m_penetrationRecoverySpeed;
+  int32 m_maxCastIterations;
+  bool m_refreshManifoldInCheckSupport;
 };
 
-class hkbProxyModifier : public hkbModifier
-{
+class hkbProxyModifier : public hkbModifier {
 public:
-	virtual ~hkbProxyModifier();
-	hkbProxyModifierProxyInfo m_proxyInfo;
-	hkVector4 m_linearVelocity;
-	float m_horizontalGain;
-	float m_verticalGain;
-	float m_maxHorizontalSeparation;
-	float m_maxVerticalSeparation;
-	float m_verticalDisplacementError;
-	float m_verticalDisplacementErrorGain;
-	float m_maxVerticalDisplacement;
-	float m_minVerticalDisplacement;
-	float m_capsuleHeight;
-	float m_capsuleRadius;
-	float m_maxSlopeForRotation;
-	uint32 m_collisionFilterInfo;
-	int8 m_phantomType;
-	int8 m_linearVelocityMode;
-	bool m_ignoreIncomingRotation;
-	bool m_ignoreCollisionDuringRotation;
-	bool m_ignoreIncomingTranslation;
-	bool m_includeDownwardMomentum;
-	bool m_followWorldFromModel;
-	bool m_isTouchingGround;
-	void *m_characterProxy;
-	void *m_phantom;
-	void *m_phantomShape;
-	hkVector4 m_horizontalDisplacement;
-	float m_verticalDisplacement;
-	float m_timestep;
-	bool m_previousFrameFollowWorldFromModel;
+  virtual ~hkbProxyModifier();
+  hkbProxyModifierProxyInfo m_proxyInfo;
+  hkVector4 m_linearVelocity;
+  float m_horizontalGain;
+  float m_verticalGain;
+  float m_maxHorizontalSeparation;
+  float m_maxVerticalSeparation;
+  float m_verticalDisplacementError;
+  float m_verticalDisplacementErrorGain;
+  float m_maxVerticalDisplacement;
+  float m_minVerticalDisplacement;
+  float m_capsuleHeight;
+  float m_capsuleRadius;
+  float m_maxSlopeForRotation;
+  uint32 m_collisionFilterInfo;
+  int8 m_phantomType;
+  int8 m_linearVelocityMode;
+  bool m_ignoreIncomingRotation;
+  bool m_ignoreCollisionDuringRotation;
+  bool m_ignoreIncomingTranslation;
+  bool m_includeDownwardMomentum;
+  bool m_followWorldFromModel;
+  bool m_isTouchingGround;
+  void *m_characterProxy;
+  void *m_phantom;
+  void *m_phantomShape;
+  hkVector4 m_horizontalDisplacement;
+  float m_verticalDisplacement;
+  float m_timestep;
+  bool m_previousFrameFollowWorldFromModel;
 };
 
-class hkbRealEventPayload : public hkbEventPayload
-{
+class hkbRealEventPayload : public hkbEventPayload {
 public:
-	virtual ~hkbRealEventPayload();
-	float m_data;
+  virtual ~hkbRealEventPayload();
+  float m_data;
 };
 
-class hkbRealVariableSequencedDataSample
-{
+class hkbRealVariableSequencedDataSample {
 public:
-	float m_time;
-	float m_value;
+  float m_time;
+  float m_value;
 };
 
-class hkbRealVariableSequencedData : public hkbSequencedData
-{
+class hkbRealVariableSequencedData : public hkbSequencedData {
 public:
-	virtual ~hkbRealVariableSequencedData();
-	hkArray<hkbRealVariableSequencedDataSample> m_samples;
-	int32 m_variableIndex;
+  virtual ~hkbRealVariableSequencedData();
+  hkArray<hkbRealVariableSequencedDataSample> m_samples;
+  int32 m_variableIndex;
 };
 
-class hkbReferencePoseGenerator : public hkbGenerator
-{
+class hkbReferencePoseGenerator : public hkbGenerator {
 public:
-	virtual ~hkbReferencePoseGenerator();
-	void *m_skeleton;
+  virtual ~hkbReferencePoseGenerator();
+  void *m_skeleton;
 };
 
-class hkaKeyFrameHierarchyUtilityControlData
-{
+class hkaKeyFrameHierarchyUtilityControlData {
 public:
-	float m_hierarchyGain;
-	float m_velocityDamping;
-	float m_accelerationGain;
-	float m_velocityGain;
-	float m_positionGain;
-	float m_positionMaxLinearVelocity;
-	float m_positionMaxAngularVelocity;
-	float m_snapGain;
-	float m_snapMaxLinearVelocity;
-	float m_snapMaxAngularVelocity;
-	float m_snapMaxLinearDistance;
-	float m_snapMaxAngularDistance;
+  float m_hierarchyGain;
+  float m_velocityDamping;
+  float m_accelerationGain;
+  float m_velocityGain;
+  float m_positionGain;
+  float m_positionMaxLinearVelocity;
+  float m_positionMaxAngularVelocity;
+  float m_snapGain;
+  float m_snapMaxLinearVelocity;
+  float m_snapMaxAngularVelocity;
+  float m_snapMaxLinearDistance;
+  float m_snapMaxAngularDistance;
 };
 
-class hkbRigidBodyRagdollControlData
-{
+class hkbRigidBodyRagdollControlData {
 public:
-	hkaKeyFrameHierarchyUtilityControlData m_keyFrameHierarchyControlData;
-	float m_durationToBlend;
+  hkaKeyFrameHierarchyUtilityControlData m_keyFrameHierarchyControlData;
+  float m_durationToBlend;
 };
 
-class hkbRigidBodyRagdollControlsModifier : public hkbModifier
-{
+class hkbRigidBodyRagdollControlsModifier : public hkbModifier {
 public:
-	virtual ~hkbRigidBodyRagdollControlsModifier();
-	hkbRigidBodyRagdollControlData m_controlData;
-	hkbBoneIndexArray *m_bones;
+  virtual ~hkbRigidBodyRagdollControlsModifier();
+  hkbRigidBodyRagdollControlData m_controlData;
+  hkbBoneIndexArray *m_bones;
 };
 
-class hkbRotateCharacterModifier : public hkbModifier
-{
+class hkbRotateCharacterModifier : public hkbModifier {
 public:
-	virtual ~hkbRotateCharacterModifier();
-	float m_degreesPerSecond;
-	float m_speedMultiplier;
-	hkVector4 m_axisOfRotation;
-	float m_angle;
+  virtual ~hkbRotateCharacterModifier();
+  float m_degreesPerSecond;
+  float m_speedMultiplier;
+  hkVector4 m_axisOfRotation;
+  float m_angle;
 };
 
-class hkbRotateCharacterModifierInternalState : public hkReferencedObject
-{
+class hkbRotateCharacterModifierInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbRotateCharacterModifierInternalState();
-	float m_angle;
+  virtual ~hkbRotateCharacterModifierInternalState();
+  float m_angle;
 };
 
-class hkbSenseHandleModifierRange
-{
+class hkbSenseHandleModifierRange {
 public:
-	hkbEventProperty m_event;
-	float m_minDistance;
-	float m_maxDistance;
-	bool m_ignoreHandle;
+  hkbEventProperty m_event;
+  float m_minDistance;
+  float m_maxDistance;
+  bool m_ignoreHandle;
 };
 
-class hkbSenseHandleModifier : public hkbModifier
-{
+class hkbSenseHandleModifier : public hkbModifier {
 public:
-	virtual ~hkbSenseHandleModifier();
-	hkbHandle m_handle;
-	hkVector4 m_sensorLocalOffset;
-	hkArray<hkbSenseHandleModifierRange> m_ranges;
-	hkbHandle *m_handleOut;
-	hkbHandle *m_handleIn;
-	hkStringPtr m_localFrameName;
-	hkStringPtr m_sensorLocalFrameName;
-	float m_minDistance;
-	float m_maxDistance;
-	float m_distanceOut;
-	uint32 m_collisionFilterInfo;
-	int16 m_sensorRagdollBoneIndex;
-	int16 m_sensorAnimationBoneIndex;
-	int8 m_sensingMode;
-	bool m_extrapolateSensorPosition;
-	bool m_keepFirstSensedHandle;
-	bool m_foundHandleOut;
-	float m_timeSinceLastModify;
-	int32 m_rangeIndexForEventToSendNextUpdate;
+  virtual ~hkbSenseHandleModifier();
+  hkbHandle m_handle;
+  hkVector4 m_sensorLocalOffset;
+  hkArray<hkbSenseHandleModifierRange> m_ranges;
+  hkbHandle *m_handleOut;
+  hkbHandle *m_handleIn;
+  hkStringPtr m_localFrameName;
+  hkStringPtr m_sensorLocalFrameName;
+  float m_minDistance;
+  float m_maxDistance;
+  float m_distanceOut;
+  uint32 m_collisionFilterInfo;
+  int16 m_sensorRagdollBoneIndex;
+  int16 m_sensorAnimationBoneIndex;
+  int8 m_sensingMode;
+  bool m_extrapolateSensorPosition;
+  bool m_keepFirstSensedHandle;
+  bool m_foundHandleOut;
+  float m_timeSinceLastModify;
+  int32 m_rangeIndexForEventToSendNextUpdate;
 };
 
-class hkbSequenceStringData : public hkReferencedObject
-{
+class hkbSequenceStringData : public hkReferencedObject {
 public:
-	virtual ~hkbSequenceStringData();
-	hkArray<hkStringPtr> m_eventNames;
-	hkArray<hkStringPtr> m_variableNames;
+  virtual ~hkbSequenceStringData();
+  hkArray<hkStringPtr> m_eventNames;
+  hkArray<hkStringPtr> m_variableNames;
 };
 
-class hkbSequence : public hkbModifier
-{
+class hkbSequence : public hkbModifier {
 public:
-	virtual ~hkbSequence();
-	hkArray<hkbEventSequencedData *> m_eventSequencedData;
-	hkArray<hkbRealVariableSequencedData *> m_realVariableSequencedData;
-	hkArray<hkbBoolVariableSequencedData *> m_boolVariableSequencedData;
-	hkArray<hkbIntVariableSequencedData *> m_intVariableSequencedData;
-	int32 m_enableEventId;
-	int32 m_disableEventId;
-	hkbSequenceStringData *m_stringData;
-	void *m_variableIdMap;
-	void *m_eventIdMap;
-	hkArray<void> m_nextSampleEvents;
-	hkArray<void> m_nextSampleReals;
-	hkArray<void> m_nextSampleBools;
-	hkArray<void> m_nextSampleInts;
-	float m_time;
-	bool m_isEnabled;
+  virtual ~hkbSequence();
+  hkArray<hkbEventSequencedData *> m_eventSequencedData;
+  hkArray<hkbRealVariableSequencedData *> m_realVariableSequencedData;
+  hkArray<hkbBoolVariableSequencedData *> m_boolVariableSequencedData;
+  hkArray<hkbIntVariableSequencedData *> m_intVariableSequencedData;
+  int32 m_enableEventId;
+  int32 m_disableEventId;
+  hkbSequenceStringData *m_stringData;
+  void *m_variableIdMap;
+  void *m_eventIdMap;
+  hkArray<void> m_nextSampleEvents;
+  hkArray<void> m_nextSampleReals;
+  hkArray<void> m_nextSampleBools;
+  hkArray<void> m_nextSampleInts;
+  float m_time;
+  bool m_isEnabled;
 };
 
-class hkbSequenceInternalState : public hkReferencedObject
-{
+class hkbSequenceInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbSequenceInternalState();
-	hkArray<int32> m_nextSampleEvents;
-	hkArray<int32> m_nextSampleReals;
-	hkArray<int32> m_nextSampleBools;
-	hkArray<int32> m_nextSampleInts;
-	float m_time;
-	bool m_isEnabled;
+  virtual ~hkbSequenceInternalState();
+  hkArray<int32> m_nextSampleEvents;
+  hkArray<int32> m_nextSampleReals;
+  hkArray<int32> m_nextSampleBools;
+  hkArray<int32> m_nextSampleInts;
+  float m_time;
+  bool m_isEnabled;
 };
 
-class hkbSetWorldFromModelModifier : public hkbModifier
-{
+class hkbSetWorldFromModelModifier : public hkbModifier {
 public:
-	virtual ~hkbSetWorldFromModelModifier();
-	hkVector4 m_translation;
-	hkQuaternion m_rotation;
-	bool m_setTranslation;
-	bool m_setRotation;
+  virtual ~hkbSetWorldFromModelModifier();
+  hkVector4 m_translation;
+  hkQuaternion m_rotation;
+  bool m_setTranslation;
+  bool m_setRotation;
 };
 
-class hkbSplinePathGenerator : public hkbGenerator
-{
+class hkbSplinePathGenerator : public hkbGenerator {
 public:
-	virtual ~hkbSplinePathGenerator();
-	hkArray<hkbRegisteredGenerator *> m_registeredGenerators;
-	hkVector4 m_characterForward;
-	hkVector4 m_targetPosition;
-	hkVector4 m_targetDirection;
-	hkbEventProperty m_pathEndEvent;
-	float m_leadInGain;
-	float m_leadOutGain;
-	bool m_useProximityTrigger;
-	float m_endEventProximity;
-	float m_endEventTime;
-	int8 m_selectedGeneratorIndex;
-	bool m_useManualSelection;
-	bool m_trackPosition;
-	bool m_usePathEstimation;
-	bool m_useCharacterForward;
-	hkVector4 m_entryPosition;
-	hkVector4 m_entryForward;
-	hkVector4 m_exitPosition;
-	hkVector4 m_exitForward;
-	float m_averageSpeed;
-	float m_pathTime;
-	float m_curTime;
-	float m_pathParam;
-	int8 m_currentGeneratorIndex;
-	bool m_doLeadInFixup;
-	bool m_eventTriggered;
+  virtual ~hkbSplinePathGenerator();
+  hkArray<hkbRegisteredGenerator *> m_registeredGenerators;
+  hkVector4 m_characterForward;
+  hkVector4 m_targetPosition;
+  hkVector4 m_targetDirection;
+  hkbEventProperty m_pathEndEvent;
+  float m_leadInGain;
+  float m_leadOutGain;
+  bool m_useProximityTrigger;
+  float m_endEventProximity;
+  float m_endEventTime;
+  int8 m_selectedGeneratorIndex;
+  bool m_useManualSelection;
+  bool m_trackPosition;
+  bool m_usePathEstimation;
+  bool m_useCharacterForward;
+  hkVector4 m_entryPosition;
+  hkVector4 m_entryForward;
+  hkVector4 m_exitPosition;
+  hkVector4 m_exitForward;
+  float m_averageSpeed;
+  float m_pathTime;
+  float m_curTime;
+  float m_pathParam;
+  int8 m_currentGeneratorIndex;
+  bool m_doLeadInFixup;
+  bool m_eventTriggered;
 };
 
-class hkbSplinePathGeneratorInternalState : public hkReferencedObject
-{
+class hkbSplinePathGeneratorInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbSplinePathGeneratorInternalState();
-	hkVector4 m_entryPosition;
-	hkVector4 m_entryForward;
-	hkVector4 m_exitPosition;
-	hkVector4 m_exitForward;
-	float m_averageSpeed;
-	float m_pathTime;
-	float m_curTime;
-	float m_pathParam;
-	int8 m_currentGeneratorIndex;
-	bool m_doLeadInFixup;
-	bool m_eventTriggered;
+  virtual ~hkbSplinePathGeneratorInternalState();
+  hkVector4 m_entryPosition;
+  hkVector4 m_entryForward;
+  hkVector4 m_exitPosition;
+  hkVector4 m_exitForward;
+  float m_averageSpeed;
+  float m_pathTime;
+  float m_curTime;
+  float m_pathParam;
+  int8 m_currentGeneratorIndex;
+  bool m_doLeadInFixup;
+  bool m_eventTriggered;
 };
 
-class hkbStateListener : public hkReferencedObject
-{
+class hkbStateListener : public hkReferencedObject {
 public:
-	virtual ~hkbStateListener();
+  virtual ~hkbStateListener();
 };
 
-class hkbStateChooser : public hkReferencedObject
-{
+class hkbStateChooser : public hkReferencedObject {
 public:
 };
 
-class hkbStateMachineEventPropertyArray : public hkReferencedObject
-{
+class hkbStateMachineEventPropertyArray : public hkReferencedObject {
 public:
-	virtual ~hkbStateMachineEventPropertyArray();
-	hkArray<hkbEventProperty> m_events;
+  virtual ~hkbStateMachineEventPropertyArray();
+  hkArray<hkbEventProperty> m_events;
 };
 
-class hkbStateMachineTimeInterval
-{
+class hkbStateMachineTimeInterval {
 public:
-	int32 m_enterEventId;
-	int32 m_exitEventId;
-	float m_enterTime;
-	float m_exitTime;
+  int32 m_enterEventId;
+  int32 m_exitEventId;
+  float m_enterTime;
+  float m_exitTime;
 };
 
-class hkbStateMachineTransitionInfo
-{
+class hkbStateMachineTransitionInfo {
 public:
-	hkbStateMachineTimeInterval m_triggerInterval;
-	hkbStateMachineTimeInterval m_initiateInterval;
-	hkbTransitionEffect *m_transition;
-	hkbCondition *m_condition;
-	int32 m_eventId;
-	int32 m_toStateId;
-	int32 m_fromNestedStateId;
-	int32 m_toNestedStateId;
-	int16 m_priority;
-	hkFlags m_flags;
+  hkbStateMachineTimeInterval m_triggerInterval;
+  hkbStateMachineTimeInterval m_initiateInterval;
+  hkbTransitionEffect *m_transition;
+  hkbCondition *m_condition;
+  int32 m_eventId;
+  int32 m_toStateId;
+  int32 m_fromNestedStateId;
+  int32 m_toNestedStateId;
+  int16 m_priority;
+  hkFlags m_flags;
 };
 
-class hkbStateMachineTransitionInfoArray : public hkReferencedObject
-{
+class hkbStateMachineTransitionInfoArray : public hkReferencedObject {
 public:
-	virtual ~hkbStateMachineTransitionInfoArray();
-	hkArray<hkbStateMachineTransitionInfo> m_transitions;
+  virtual ~hkbStateMachineTransitionInfoArray();
+  hkArray<hkbStateMachineTransitionInfo> m_transitions;
 };
 
-class hkbStateMachineStateInfo : public hkbBindable
-{
+class hkbStateMachineStateInfo : public hkbBindable {
 public:
-	virtual ~hkbStateMachineStateInfo();
-	hkArray<hkbStateListener *> m_listeners;
-	hkbStateMachineEventPropertyArray *m_enterNotifyEvents;
-	hkbStateMachineEventPropertyArray *m_exitNotifyEvents;
-	hkbStateMachineTransitionInfoArray *m_transitions;
-	hkbGenerator *m_generator;
-	hkStringPtr m_name;
-	int32 m_stateId;
-	float m_probability;
-	bool m_enable;
+  virtual ~hkbStateMachineStateInfo();
+  hkArray<hkbStateListener *> m_listeners;
+  hkbStateMachineEventPropertyArray *m_enterNotifyEvents;
+  hkbStateMachineEventPropertyArray *m_exitNotifyEvents;
+  hkbStateMachineTransitionInfoArray *m_transitions;
+  hkbGenerator *m_generator;
+  hkStringPtr m_name;
+  int32 m_stateId;
+  float m_probability;
+  bool m_enable;
 };
 
-class hkbStateMachine : public hkbGenerator
-{
+class hkbStateMachine : public hkbGenerator {
 public:
-	virtual ~hkbStateMachine();
-	hkbEvent m_eventToSendWhenStateOrTransitionChanges;
-	hkbStateChooser *m_startStateChooser;
-	int32 m_startStateId;
-	int32 m_returnToPreviousStateEventId;
-	int32 m_randomTransitionEventId;
-	int32 m_transitionToNextHigherStateEventId;
-	int32 m_transitionToNextLowerStateEventId;
-	int32 m_syncVariableIndex;
-	int32 m_currentStateId;
-	bool m_wrapAroundStateId;
-	int8 m_maxSimultaneousTransitions;
-	int8 m_startStateMode;
-	int8 m_selfTransitionMode;
-	bool m_isActive;
-	hkArray<hkbStateMachineStateInfo *> m_states;
-	hkbStateMachineTransitionInfoArray *m_wildcardTransitions;
-	void *m_stateIdToIndexMap;
-	hkArray<void> m_activeTransitions;
-	hkArray<void> m_transitionFlags;
-	hkArray<void> m_wildcardTransitionFlags;
-	hkArray<void> m_delayedTransitions;
-	float m_timeInState;
-	float m_lastLocalTime;
-	int32 m_previousStateId;
-	int32 m_nextStartStateIndexOverride;
-	bool m_stateOrTransitionChanged;
-	bool m_echoNextUpdate;
-	uint16 m_sCurrentStateIndexAndEntered;
+  virtual ~hkbStateMachine();
+  hkbEvent m_eventToSendWhenStateOrTransitionChanges;
+  hkbStateChooser *m_startStateChooser;
+  int32 m_startStateId;
+  int32 m_returnToPreviousStateEventId;
+  int32 m_randomTransitionEventId;
+  int32 m_transitionToNextHigherStateEventId;
+  int32 m_transitionToNextLowerStateEventId;
+  int32 m_syncVariableIndex;
+  int32 m_currentStateId;
+  bool m_wrapAroundStateId;
+  int8 m_maxSimultaneousTransitions;
+  int8 m_startStateMode;
+  int8 m_selfTransitionMode;
+  bool m_isActive;
+  hkArray<hkbStateMachineStateInfo *> m_states;
+  hkbStateMachineTransitionInfoArray *m_wildcardTransitions;
+  void *m_stateIdToIndexMap;
+  hkArray<void> m_activeTransitions;
+  hkArray<void> m_transitionFlags;
+  hkArray<void> m_wildcardTransitionFlags;
+  hkArray<void> m_delayedTransitions;
+  float m_timeInState;
+  float m_lastLocalTime;
+  int32 m_previousStateId;
+  int32 m_nextStartStateIndexOverride;
+  bool m_stateOrTransitionChanged;
+  bool m_echoNextUpdate;
+  uint16 m_sCurrentStateIndexAndEntered;
 };
 
-class hkbStateMachineTransitionInfoReference
-{
+class hkbStateMachineTransitionInfoReference {
 public:
-	int16 m_fromStateIndex;
-	int16 m_transitionIndex;
-	int16 m_stateMachineId;
+  int16 m_fromStateIndex;
+  int16 m_transitionIndex;
+  int16 m_stateMachineId;
 };
 
-class hkbStateMachineProspectiveTransitionInfo
-{
+class hkbStateMachineProspectiveTransitionInfo {
 public:
-	hkbStateMachineTransitionInfoReference m_transitionInfoReference;
-	hkbStateMachineTransitionInfoReference m_transitionInfoReferenceForTE;
-	int32 m_toStateId;
+  hkbStateMachineTransitionInfoReference m_transitionInfoReference;
+  hkbStateMachineTransitionInfoReference m_transitionInfoReferenceForTE;
+  int32 m_toStateId;
 };
 
-class hkbStateMachineDelayedTransitionInfo
-{
+class hkbStateMachineDelayedTransitionInfo {
 public:
-	hkbStateMachineProspectiveTransitionInfo m_delayedTransition;
-	float m_timeDelayed;
-	bool m_isDelayedTransitionReturnToPreviousState;
-	bool m_wasInAbutRangeLastFrame;
+  hkbStateMachineProspectiveTransitionInfo m_delayedTransition;
+  float m_timeDelayed;
+  bool m_isDelayedTransitionReturnToPreviousState;
+  bool m_wasInAbutRangeLastFrame;
 };
 
-class hkbStateMachineActiveTransitionInfo
-{
+class hkbStateMachineActiveTransitionInfo {
 public:
-	void *m_transitionEffect;
-	hkbNodeInternalStateInfo *m_transitionEffectInternalStateInfo;
-	hkbStateMachineTransitionInfoReference m_transitionInfoReference;
-	hkbStateMachineTransitionInfoReference m_transitionInfoReferenceForTE;
-	int32 m_fromStateId;
-	int32 m_toStateId;
-	bool m_isReturnToPreviousState;
+  void *m_transitionEffect;
+  hkbNodeInternalStateInfo *m_transitionEffectInternalStateInfo;
+  hkbStateMachineTransitionInfoReference m_transitionInfoReference;
+  hkbStateMachineTransitionInfoReference m_transitionInfoReferenceForTE;
+  int32 m_fromStateId;
+  int32 m_toStateId;
+  bool m_isReturnToPreviousState;
 };
 
-class hkbStateMachineInternalState : public hkReferencedObject
-{
+class hkbStateMachineInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbStateMachineInternalState();
-	hkArray<hkbStateMachineActiveTransitionInfo> m_activeTransitions;
-	hkArray<uint8> m_transitionFlags;
-	hkArray<uint8> m_wildcardTransitionFlags;
-	hkArray<hkbStateMachineDelayedTransitionInfo> m_delayedTransitions;
-	float m_timeInState;
-	float m_lastLocalTime;
-	int32 m_currentStateId;
-	int32 m_previousStateId;
-	int32 m_nextStartStateIndexOverride;
-	bool m_stateOrTransitionChanged;
-	bool m_echoNextUpdate;
+  virtual ~hkbStateMachineInternalState();
+  hkArray<hkbStateMachineActiveTransitionInfo> m_activeTransitions;
+  hkArray<uint8> m_transitionFlags;
+  hkArray<uint8> m_wildcardTransitionFlags;
+  hkArray<hkbStateMachineDelayedTransitionInfo> m_delayedTransitions;
+  float m_timeInState;
+  float m_lastLocalTime;
+  int32 m_currentStateId;
+  int32 m_previousStateId;
+  int32 m_nextStartStateIndexOverride;
+  bool m_stateOrTransitionChanged;
+  bool m_echoNextUpdate;
 };
 
-class hkbStringCondition : public hkbCondition
-{
+class hkbStringCondition : public hkbCondition {
 public:
-	virtual ~hkbStringCondition();
-	hkStringPtr m_conditionString;
+  virtual ~hkbStringCondition();
+  hkStringPtr m_conditionString;
 };
 
-class hkbStringEventPayload : public hkbEventPayload
-{
+class hkbStringEventPayload : public hkbEventPayload {
 public:
-	virtual ~hkbStringEventPayload();
-	hkStringPtr m_data;
+  virtual ~hkbStringEventPayload();
+  hkStringPtr m_data;
 };
 
-class hkbTimerModifier : public hkbModifier
-{
+class hkbTimerModifier : public hkbModifier {
 public:
-	virtual ~hkbTimerModifier();
-	float m_alarmTimeSeconds;
-	hkbEventProperty m_alarmEvent;
-	float m_secondsElapsed;
+  virtual ~hkbTimerModifier();
+  float m_alarmTimeSeconds;
+  hkbEventProperty m_alarmEvent;
+  float m_secondsElapsed;
 };
 
-class hkbTimerModifierInternalState : public hkReferencedObject
-{
+class hkbTimerModifierInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbTimerModifierInternalState();
-	float m_secondsElapsed;
+  virtual ~hkbTimerModifierInternalState();
+  float m_secondsElapsed;
 };
 
-class hkbTransformVectorModifier : public hkbModifier
-{
+class hkbTransformVectorModifier : public hkbModifier {
 public:
-	virtual ~hkbTransformVectorModifier();
-	hkQuaternion m_rotation;
-	hkVector4 m_translation;
-	hkVector4 m_vectorIn;
-	hkVector4 m_vectorOut;
-	bool m_rotateOnly;
-	bool m_inverse;
-	bool m_computeOnActivate;
-	bool m_computeOnModify;
+  virtual ~hkbTransformVectorModifier();
+  hkQuaternion m_rotation;
+  hkVector4 m_translation;
+  hkVector4 m_vectorIn;
+  hkVector4 m_vectorOut;
+  bool m_rotateOnly;
+  bool m_inverse;
+  bool m_computeOnActivate;
+  bool m_computeOnModify;
 };
 
-class hkbTransformVectorModifierInternalState : public hkReferencedObject
-{
+class hkbTransformVectorModifierInternalState : public hkReferencedObject {
 public:
-	virtual ~hkbTransformVectorModifierInternalState();
-	hkVector4 m_vectorOut;
+  virtual ~hkbTransformVectorModifierInternalState();
+  hkVector4 m_vectorOut;
 };
 
-class hkbTwistModifier : public hkbModifier
-{
+class hkbTwistModifier : public hkbModifier {
 public:
-	virtual ~hkbTwistModifier();
-	hkVector4 m_axisOfRotation;
-	float m_twistAngle;
-	int16 m_startBoneIndex;
-	int16 m_endBoneIndex;
-	int8 m_setAngleMethod;
-	int8 m_rotationAxisCoordinates;
-	bool m_isAdditive;
-	hkArray<void> m_boneChainIndices;
-	hkArray<void> m_parentBoneIndices;
+  virtual ~hkbTwistModifier();
+  hkVector4 m_axisOfRotation;
+  float m_twistAngle;
+  int16 m_startBoneIndex;
+  int16 m_endBoneIndex;
+  int8 m_setAngleMethod;
+  int8 m_rotationAxisCoordinates;
+  bool m_isAdditive;
+  hkArray<void> m_boneChainIndices;
+  hkArray<void> m_parentBoneIndices;
 };
 
-class hkbAlignBoneModifier : public hkbModifier
-{
+class hkbAlignBoneModifier : public hkbModifier {
 public:
-	virtual ~hkbAlignBoneModifier();
-	int8 m_alignMode;
-	int8 m_alignTargetMode;
-	bool m_alignSingleAxis;
-	hkVector4 m_alignAxis;
-	hkVector4 m_alignTargetAxis;
-	hkQuaternion m_frameOfReference;
-	float m_duration;
-	int32 m_alignModeIndex;
-	int32 m_alignTargetModeIndex;
-	float m_time;
-	float m_timeSinceLastModify;
+  virtual ~hkbAlignBoneModifier();
+  int8 m_alignMode;
+  int8 m_alignTargetMode;
+  bool m_alignSingleAxis;
+  hkVector4 m_alignAxis;
+  hkVector4 m_alignTargetAxis;
+  hkQuaternion m_frameOfReference;
+  float m_duration;
+  int32 m_alignModeIndex;
+  int32 m_alignTargetModeIndex;
+  float m_time;
+  float m_timeSinceLastModify;
 };
 
-class hkbAnimatedSkeletonGenerator : public hkbGenerator
-{
+class hkbAnimatedSkeletonGenerator : public hkbGenerator {
 public:
-	virtual ~hkbAnimatedSkeletonGenerator();
-	void *m_animatedSkeleton;
+  virtual ~hkbAnimatedSkeletonGenerator();
+  void *m_animatedSkeleton;
 };
 
-class hkbAuxiliaryNodeInfo : public hkReferencedObject
-{
+class hkbAuxiliaryNodeInfo : public hkReferencedObject {
 public:
-	virtual ~hkbAuxiliaryNodeInfo();
-	uint8 m_type;
-	uint8 m_depth;
-	hkStringPtr m_referenceBehaviorName;
-	hkArray<hkStringPtr> m_selfTransitionNames;
+  virtual ~hkbAuxiliaryNodeInfo();
+  uint8 m_type;
+  uint8 m_depth;
+  hkStringPtr m_referenceBehaviorName;
+  hkArray<hkStringPtr> m_selfTransitionNames;
 };
 
-class hkbBalanceModifierStepInfo
-{
+class hkbBalanceModifierStepInfo {
 public:
-	int16 m_boneIndex;
-	float m_fractionOfSolution;
+  int16 m_boneIndex;
+  float m_fractionOfSolution;
 };
 
-class hkbBalanceModifier : public hkbModifier
-{
+class hkbBalanceModifier : public hkbModifier {
 public:
-	virtual ~hkbBalanceModifier();
-	bool m_giveUp;
-	float m_comDistThreshold;
-	bool m_passThrough;
-	int16 m_ragdollLeftFootBoneIndex;
-	int16 m_ragdollRightFootBoneIndex;
-	float m_balanceOnAnklesFraction;
-	int32 m_upAxis;
-	float m_fadeInTime;
-	float m_comBiasX;
-	hkArray<hkbBalanceModifierStepInfo> m_stepInfo;
-	float m_timeLapsed;
+  virtual ~hkbBalanceModifier();
+  bool m_giveUp;
+  float m_comDistThreshold;
+  bool m_passThrough;
+  int16 m_ragdollLeftFootBoneIndex;
+  int16 m_ragdollRightFootBoneIndex;
+  float m_balanceOnAnklesFraction;
+  int32 m_upAxis;
+  float m_fadeInTime;
+  float m_comBiasX;
+  hkArray<hkbBalanceModifierStepInfo> m_stepInfo;
+  float m_timeLapsed;
 };
 
-class hkbRadialSelectorGeneratorGeneratorInfo
-{
+class hkbRadialSelectorGeneratorGeneratorInfo {
 public:
-	hkbGenerator *m_generator;
-	float m_angle;
-	float m_radialSpeed;
+  hkbGenerator *m_generator;
+  float m_angle;
+  float m_radialSpeed;
 };
 
-class hkbRadialSelectorGeneratorGeneratorPair
-{
+class hkbRadialSelectorGeneratorGeneratorPair {
 public:
-	hkbRadialSelectorGeneratorGeneratorInfo m_generators;
-	float m_minAngle;
-	float m_maxAngle;
+  hkbRadialSelectorGeneratorGeneratorInfo m_generators;
+  float m_minAngle;
+  float m_maxAngle;
 };
 
-class hkbRadialSelectorGenerator : public hkbGenerator
-{
+class hkbRadialSelectorGenerator : public hkbGenerator {
 public:
-	virtual ~hkbRadialSelectorGenerator();
-	hkArray<hkbRadialSelectorGeneratorGeneratorPair> m_generatorPairs;
-	float m_angle;
-	float m_radius;
-	int32 m_currentGeneratorPairIndex;
-	int32 m_currentEndpointIndex;
-	float m_currentFraction;
-	bool m_hasSetLocalTime;
+  virtual ~hkbRadialSelectorGenerator();
+  hkArray<hkbRadialSelectorGeneratorGeneratorPair> m_generatorPairs;
+  float m_angle;
+  float m_radius;
+  int32 m_currentGeneratorPairIndex;
+  int32 m_currentEndpointIndex;
+  float m_currentFraction;
+  bool m_hasSetLocalTime;
 };
 
-class hkbCheckBalanceModifier : public hkbModifier
-{
+class hkbCheckBalanceModifier : public hkbModifier {
 public:
-	virtual ~hkbCheckBalanceModifier();
-	int16 m_ragdollLeftFootBoneIndex;
-	int16 m_ragdollRightFootBoneIndex;
-	float m_balanceOnAnklesFraction;
-	hkbEvent m_eventToSendWhenOffBalance;
-	float m_offBalanceEventThreshold;
-	int32 m_worldUpAxisIndex;
-	float m_comBiasX;
-	bool m_extractRagdollPose;
-	float m_mass;
-	hkVector4 m_comWS;
-	hkVector4 m_desiredComWS;
-	float m_offBalanceDistance;
-	hkVector4 m_errorMS;
+  virtual ~hkbCheckBalanceModifier();
+  int16 m_ragdollLeftFootBoneIndex;
+  int16 m_ragdollRightFootBoneIndex;
+  float m_balanceOnAnklesFraction;
+  hkbEvent m_eventToSendWhenOffBalance;
+  float m_offBalanceEventThreshold;
+  int32 m_worldUpAxisIndex;
+  float m_comBiasX;
+  bool m_extractRagdollPose;
+  float m_mass;
+  hkVector4 m_comWS;
+  hkVector4 m_desiredComWS;
+  float m_offBalanceDistance;
+  hkVector4 m_errorMS;
 };
 
-class hkbBalanceRadialSelectorGenerator : public hkbRadialSelectorGenerator
-{
+class hkbBalanceRadialSelectorGenerator : public hkbRadialSelectorGenerator {
 public:
-	virtual ~hkbBalanceRadialSelectorGenerator();
-	int32 m_xAxisMS;
-	int32 m_yAxisMS;
-	hkbCheckBalanceModifier *m_checkBalanceModifier;
+  virtual ~hkbBalanceRadialSelectorGenerator();
+  int32 m_xAxisMS;
+  int32 m_yAxisMS;
+  hkbCheckBalanceModifier *m_checkBalanceModifier;
 };
 
-class hkbBehaviorEventsInfo : public hkReferencedObject
-{
+class hkbBehaviorEventsInfo : public hkReferencedObject {
 public:
-	virtual ~hkbBehaviorEventsInfo();
-	uint64 m_characterId;
-	hkArray<int16> m_externalEventIds;
-	int32 m_padding;
+  virtual ~hkbBehaviorEventsInfo();
+  uint64 m_characterId;
+  hkArray<int16> m_externalEventIds;
+  int32 m_padding;
 };
 
-class hkbBehaviorGraphInternalStateInfo : public hkReferencedObject
-{
+class hkbBehaviorGraphInternalStateInfo : public hkReferencedObject {
 public:
-	virtual ~hkbBehaviorGraphInternalStateInfo();
-	uint64 m_characterId;
-	hkbBehaviorGraphInternalState *m_internalState;
-	hkArray<hkbAuxiliaryNodeInfo *> m_auxiliaryNodeInfo;
-	hkArray<int16> m_activeEventIds;
-	hkArray<int16> m_activeVariableIds;
+  virtual ~hkbBehaviorGraphInternalStateInfo();
+  uint64 m_characterId;
+  hkbBehaviorGraphInternalState *m_internalState;
+  hkArray<hkbAuxiliaryNodeInfo *> m_auxiliaryNodeInfo;
+  hkArray<int16> m_activeEventIds;
+  hkArray<int16> m_activeVariableIds;
 };
 
-class hkbBehaviorInfoIdToNamePair
-{
+class hkbBehaviorInfoIdToNamePair {
 public:
-	hkStringPtr m_behaviorName;
-	hkStringPtr m_nodeName;
-	uint8 m_toolType;
-	int16 m_id;
+  hkStringPtr m_behaviorName;
+  hkStringPtr m_nodeName;
+  uint8 m_toolType;
+  int16 m_id;
 };
 
-class hkbBehaviorInfo : public hkReferencedObject
-{
+class hkbBehaviorInfo : public hkReferencedObject {
 public:
-	virtual ~hkbBehaviorInfo();
-	uint64 m_characterId;
-	hkbBehaviorGraphData *m_data;
-	hkArray<hkbBehaviorInfoIdToNamePair> m_idToNamePairs;
+  virtual ~hkbBehaviorInfo();
+  uint64 m_characterId;
+  hkbBehaviorGraphData *m_data;
+  hkArray<hkbBehaviorInfoIdToNamePair> m_idToNamePairs;
 };
 
-class hkbCameraShakeEventPayload : public hkbEventPayload
-{
+class hkbCameraShakeEventPayload : public hkbEventPayload {
 public:
-	virtual ~hkbCameraShakeEventPayload();
-	float m_amplitude;
-	float m_halfLife;
+  virtual ~hkbCameraShakeEventPayload();
+  float m_amplitude;
+  float m_halfLife;
 };
 
-class hkbCatchFallModifierHand
-{
+class hkbCatchFallModifierHand {
 public:
-	int16 m_animShoulderIndex;
-	int16 m_ragdollShoulderIndex;
-	int16 m_ragdollAnkleIndex;
+  int16 m_animShoulderIndex;
+  int16 m_ragdollShoulderIndex;
+  int16 m_ragdollAnkleIndex;
 };
 
-class hkbCatchFallModifier : public hkbModifier
-{
+class hkbCatchFallModifier : public hkbModifier {
 public:
-	virtual ~hkbCatchFallModifier();
-	hkVector4 m_directionOfFallForwardLS;
-	hkVector4 m_directionOfFallRightLS;
-	hkVector4 m_directionOfFallUpLS;
-	hkbBoneIndexArray *m_spineIndices;
-	hkbCatchFallModifierHand m_leftHand;
-	hkbCatchFallModifierHand m_rightHand;
-	hkbEventProperty m_catchFallDoneEvent;
-	float m_spreadHandsMultiplier;
-	float m_radarRange;
-	float m_previousTargetBlendWeight;
-	float m_handsBendDistance;
-	float m_maxReachDistanceForward;
-	float m_maxReachDistanceBackward;
-	float m_fadeInReachGainSpeed;
-	float m_fadeOutReachGainSpeed;
-	float m_fadeOutDuration;
-	float m_fadeInTwistSpeed;
-	float m_fadeOutTwistSpeed;
-	int16 m_raycastLayer;
-	int16 m_velocityRagdollBoneIndex;
-	int16 m_directionOfFallRagdollBoneIndex;
-	bool m_orientHands;
-	hkVector4 m_catchFallPosInBS;
-	float m_currentReachGain;
-	float m_timeSinceLastModify;
-	float m_currentTwistGain;
-	int16 m_currentTwistDirection;
-	bool m_catchFallPosIsValid;
-	bool m_catchFallBegin;
-	bool m_catchFallEnd;
-	int8 m_fadeState;
+  virtual ~hkbCatchFallModifier();
+  hkVector4 m_directionOfFallForwardLS;
+  hkVector4 m_directionOfFallRightLS;
+  hkVector4 m_directionOfFallUpLS;
+  hkbBoneIndexArray *m_spineIndices;
+  hkbCatchFallModifierHand m_leftHand;
+  hkbCatchFallModifierHand m_rightHand;
+  hkbEventProperty m_catchFallDoneEvent;
+  float m_spreadHandsMultiplier;
+  float m_radarRange;
+  float m_previousTargetBlendWeight;
+  float m_handsBendDistance;
+  float m_maxReachDistanceForward;
+  float m_maxReachDistanceBackward;
+  float m_fadeInReachGainSpeed;
+  float m_fadeOutReachGainSpeed;
+  float m_fadeOutDuration;
+  float m_fadeInTwistSpeed;
+  float m_fadeOutTwistSpeed;
+  int16 m_raycastLayer;
+  int16 m_velocityRagdollBoneIndex;
+  int16 m_directionOfFallRagdollBoneIndex;
+  bool m_orientHands;
+  hkVector4 m_catchFallPosInBS;
+  float m_currentReachGain;
+  float m_timeSinceLastModify;
+  float m_currentTwistGain;
+  int16 m_currentTwistDirection;
+  bool m_catchFallPosIsValid;
+  bool m_catchFallBegin;
+  bool m_catchFallEnd;
+  int8 m_fadeState;
 };
 
-class hkbCharacterAddedInfo : public hkReferencedObject
-{
+class hkbCharacterAddedInfo : public hkReferencedObject {
 public:
-	virtual ~hkbCharacterAddedInfo();
-	uint64 m_characterId;
-	hkStringPtr m_instanceName;
-	hkStringPtr m_templateName;
-	hkStringPtr m_fullPathToProject;
-	hkaSkeleton *m_skeleton;
-	hkQsTransform m_worldFromModel;
-	hkArray<hkQsTransform> m_poseModelSpace;
+  virtual ~hkbCharacterAddedInfo();
+  uint64 m_characterId;
+  hkStringPtr m_instanceName;
+  hkStringPtr m_templateName;
+  hkStringPtr m_fullPathToProject;
+  hkaSkeleton *m_skeleton;
+  hkQsTransform m_worldFromModel;
+  hkArray<hkQsTransform> m_poseModelSpace;
 };
 
-class hkbCharacterControlCommand : public hkReferencedObject
-{
+class hkbCharacterControlCommand : public hkReferencedObject {
 public:
-	virtual ~hkbCharacterControlCommand();
-	uint64 m_characterId;
-	uint8 m_command;
-	int32 m_padding;
+  virtual ~hkbCharacterControlCommand();
+  uint64 m_characterId;
+  uint8 m_command;
+  int32 m_padding;
 };
 
-class hkbCharacterInfo : public hkReferencedObject
-{
+class hkbCharacterInfo : public hkReferencedObject {
 public:
-	virtual ~hkbCharacterInfo();
-	uint64 m_characterId;
-	uint8 m_event;
-	int32 m_padding;
+  virtual ~hkbCharacterInfo();
+  uint64 m_characterId;
+  uint8 m_event;
+  int32 m_padding;
 };
 
-class hkbCharacterSkinInfo : public hkReferencedObject
-{
+class hkbCharacterSkinInfo : public hkReferencedObject {
 public:
-	virtual ~hkbCharacterSkinInfo();
-	uint64 m_characterId;
-	hkArray<uint64> m_deformableSkins;
-	hkArray<uint64> m_rigidSkins;
+  virtual ~hkbCharacterSkinInfo();
+  uint64 m_characterId;
+  hkArray<uint64> m_deformableSkins;
+  hkArray<uint64> m_rigidSkins;
 };
 
-class hkbCharacterSteppedInfo : public hkReferencedObject
-{
+class hkbCharacterSteppedInfo : public hkReferencedObject {
 public:
-	virtual ~hkbCharacterSteppedInfo();
-	uint64 m_characterId;
-	float m_deltaTime;
-	hkQsTransform m_worldFromModel;
-	hkArray<hkQsTransform> m_poseModelSpace;
-	hkArray<hkQsTransform> m_rigidAttachmentTransforms;
+  virtual ~hkbCharacterSteppedInfo();
+  uint64 m_characterId;
+  float m_deltaTime;
+  hkQsTransform m_worldFromModel;
+  hkArray<hkQsTransform> m_poseModelSpace;
+  hkArray<hkQsTransform> m_rigidAttachmentTransforms;
 };
 
-class hkbCheckRagdollSpeedModifier : public hkbModifier
-{
+class hkbCheckRagdollSpeedModifier : public hkbModifier {
 public:
-	virtual ~hkbCheckRagdollSpeedModifier();
-	hkbEventProperty m_eventToSend;
-	float m_minSpeedThreshold;
-	float m_maxSpeedThreshold;
+  virtual ~hkbCheckRagdollSpeedModifier();
+  hkbEventProperty m_eventToSend;
+  float m_minSpeedThreshold;
+  float m_maxSpeedThreshold;
 };
 
-class hkbClientCharacterState : public hkReferencedObject
-{
+class hkbClientCharacterState : public hkReferencedObject {
 public:
-	virtual ~hkbClientCharacterState();
-	hkArray<uint64> m_deformableSkinIds;
-	hkArray<uint64> m_rigidSkinIds;
-	hkArray<int16> m_externalEventIds;
-	hkArray<hkbAuxiliaryNodeInfo *> m_auxiliaryInfo;
-	hkArray<int16> m_activeEventIds;
-	hkArray<int16> m_activeVariableIds;
-	uint64 m_characterId;
-	hkStringPtr m_instanceName;
-	hkStringPtr m_templateName;
-	hkStringPtr m_fullPathToProject;
-	hkbBehaviorGraphData *m_behaviorData;
-	hkbBehaviorGraphInternalState *m_behaviorInternalState;
-	void *m_nodeIdToInternalStateMap;
-	bool m_visible;
-	float m_elapsedSimulationTime;
-	hkaSkeleton *m_skeleton;
-	hkQsTransform m_worldFromModel;
-	hkArray<hkQsTransform> m_poseModelSpace;
-	hkArray<hkQsTransform> m_rigidAttachmentTransforms;
+  virtual ~hkbClientCharacterState();
+  hkArray<uint64> m_deformableSkinIds;
+  hkArray<uint64> m_rigidSkinIds;
+  hkArray<int16> m_externalEventIds;
+  hkArray<hkbAuxiliaryNodeInfo *> m_auxiliaryInfo;
+  hkArray<int16> m_activeEventIds;
+  hkArray<int16> m_activeVariableIds;
+  uint64 m_characterId;
+  hkStringPtr m_instanceName;
+  hkStringPtr m_templateName;
+  hkStringPtr m_fullPathToProject;
+  hkbBehaviorGraphData *m_behaviorData;
+  hkbBehaviorGraphInternalState *m_behaviorInternalState;
+  void *m_nodeIdToInternalStateMap;
+  bool m_visible;
+  float m_elapsedSimulationTime;
+  hkaSkeleton *m_skeleton;
+  hkQsTransform m_worldFromModel;
+  hkArray<hkQsTransform> m_poseModelSpace;
+  hkArray<hkQsTransform> m_rigidAttachmentTransforms;
 };
 
-class hkbComputeWorldFromModelModifier : public hkbModifier
-{
+class hkbComputeWorldFromModelModifier : public hkbModifier {
 public:
-	virtual ~hkbComputeWorldFromModelModifier();
-	int16 m_poseMatchingRootBoneIndex;
-	int16 m_poseMatchingOtherBoneIndex;
-	int16 m_poseMatchingAnotherBoneIndex;
+  virtual ~hkbComputeWorldFromModelModifier();
+  int16 m_poseMatchingRootBoneIndex;
+  int16 m_poseMatchingOtherBoneIndex;
+  int16 m_poseMatchingAnotherBoneIndex;
 };
 
-class hkbTarget : public hkReferencedObject
-{
+class hkbTarget : public hkReferencedObject {
 public:
-	virtual ~hkbTarget();
-	void *m_target;
-	hkVector4 m_contactPointTS;
-	hkVector4 m_contactNormalTS;
-	hkVector4 m_shapeCentroidTS;
-	float m_distance;
-	int8 m_targetPriority;
+  virtual ~hkbTarget();
+  void *m_target;
+  hkVector4 m_contactPointTS;
+  hkVector4 m_contactNormalTS;
+  hkVector4 m_shapeCentroidTS;
+  float m_distance;
+  int8 m_targetPriority;
 };
 
-class hkbConstrainRigidBodyModifier : public hkbModifier
-{
+class hkbConstrainRigidBodyModifier : public hkbModifier {
 public:
-	virtual ~hkbConstrainRigidBodyModifier();
-	hkbTarget *m_targetIn;
-	float m_breakThreshold;
-	int16 m_ragdollBoneToConstrain;
-	bool m_breakable;
-	int8 m_pivotPlacement;
-	int8 m_boneToConstrainPlacement;
-	int8 m_constraintType;
-	bool m_clearTargetData;
-	bool m_isConstraintHinge;
-	void *m_constraint;
+  virtual ~hkbConstrainRigidBodyModifier();
+  hkbTarget *m_targetIn;
+  float m_breakThreshold;
+  int16 m_ragdollBoneToConstrain;
+  bool m_breakable;
+  int8 m_pivotPlacement;
+  int8 m_boneToConstrainPlacement;
+  int8 m_constraintType;
+  bool m_clearTargetData;
+  bool m_isConstraintHinge;
+  void *m_constraint;
 };
 
-class hkbControlledReachModifier : public hkbModifier
-{
+class hkbControlledReachModifier : public hkbModifier {
 public:
-	virtual ~hkbControlledReachModifier();
-	void *m_target;
-	float m_time;
-	float m_fadeInStart;
-	float m_fadeInEnd;
-	float m_fadeOutStart;
-	float m_fadeOutEnd;
-	float m_fadeOutDuration;
-	float m_sensorAngle;
-	int16 m_handIndex;
-	bool m_isHandEnabled;
+  virtual ~hkbControlledReachModifier();
+  void *m_target;
+  float m_time;
+  float m_fadeInStart;
+  float m_fadeInEnd;
+  float m_fadeOutStart;
+  float m_fadeOutEnd;
+  float m_fadeOutDuration;
+  float m_sensorAngle;
+  int16 m_handIndex;
+  bool m_isHandEnabled;
 };
 
-class hkbCustomTestGeneratorStruck
-{
+class hkbCustomTestGeneratorStruck {
 public:
-	bool m_hkBool;
-	hkStringPtr m_string;
-	int32 m_int;
-	int8 m_hkInt8;
-	int16 m_hkInt16;
-	int32 m_hkInt32;
-	uint8 m_hkUint8;
-	uint16 m_hkUint16;
-	uint32 m_hkUint32;
-	float m_hkReal;
-	int8 m_mode_hkInt8;
-	int16 m_mode_hkInt16;
-	int32 m_mode_hkInt32;
-	uint8 m_mode_hkUint8;
-	uint16 m_mode_hkUint16;
-	uint32 m_mode_hkUint32;
-	hkFlags m_flags_hkInt8;
-	hkFlags m_flags_hkInt16;
-	hkFlags m_flags_hkInt32;
-	hkFlags m_flags_hkUint8;
-	hkFlags m_flags_hkUint16;
-	hkFlags m_flags_hkUint32;
-	hkbGenerator *m_generator1;
-	hkbGenerator *m_generator2;
-	hkbModifier *m_modifier1;
-	hkbModifier *m_modifier2;
+  bool m_hkBool;
+  hkStringPtr m_string;
+  int32 m_int;
+  int8 m_hkInt8;
+  int16 m_hkInt16;
+  int32 m_hkInt32;
+  uint8 m_hkUint8;
+  uint16 m_hkUint16;
+  uint32 m_hkUint32;
+  float m_hkReal;
+  int8 m_mode_hkInt8;
+  int16 m_mode_hkInt16;
+  int32 m_mode_hkInt32;
+  uint8 m_mode_hkUint8;
+  uint16 m_mode_hkUint16;
+  uint32 m_mode_hkUint32;
+  hkFlags m_flags_hkInt8;
+  hkFlags m_flags_hkInt16;
+  hkFlags m_flags_hkInt32;
+  hkFlags m_flags_hkUint8;
+  hkFlags m_flags_hkUint16;
+  hkFlags m_flags_hkUint32;
+  hkbGenerator *m_generator1;
+  hkbGenerator *m_generator2;
+  hkbModifier *m_modifier1;
+  hkbModifier *m_modifier2;
 };
 
-class hkbCustomTestGenerator : public hkbReferencePoseGenerator
-{
+class hkbCustomTestGenerator : public hkbReferencePoseGenerator {
 public:
-	virtual ~hkbCustomTestGenerator();
-	bool m_hkBool;
-	hkStringPtr m_string;
-	int32 m_int;
-	int8 m_hkInt8;
-	int16 m_hkInt16;
-	int32 m_hkInt32;
-	uint8 m_hkUint8;
-	uint16 m_hkUint16;
-	uint32 m_hkUint32;
-	float m_hkReal;
-	hkVector4 m_hkVector4;
-	hkQuaternion m_hkQuaternion;
-	hkpRigidBody *m_hkRigidBody;
-	int8 m_mode_hkInt8;
-	int16 m_mode_hkInt16;
-	int32 m_mode_hkInt32;
-	uint8 m_mode_hkUint8;
-	uint16 m_mode_hkUint16;
-	uint32 m_mode_hkUint32;
-	hkFlags m_flags_hkInt8;
-	hkFlags m_flags_hkInt16;
-	hkFlags m_flags_hkInt32;
-	hkFlags m_flags_hkUint8;
-	hkFlags m_flags_hkUint16;
-	hkFlags m_flags_hkUint32;
-	int32 m_myInt;
-	hkbGenerator *m_generator1;
-	hkbGenerator *m_generator2;
-	hkbModifier *m_modifier1;
-	hkbModifier *m_modifier2;
-	hkArray<bool> m_array_hkBool;
-	hkArray<int32> m_array_int;
-	hkArray<int8> m_array_hkInt8;
-	hkArray<int16> m_array_hkInt16;
-	hkArray<int32> m_array_hkInt32;
-	hkArray<int8> m_array_hkUint8;
-	hkArray<int16> m_array_hkUint16;
-	hkArray<int32> m_array_hkUint32;
-	hkArray<float> m_array_hkReal;
-	hkArray<hkbGenerator *> m_array_hkbGenerator;
-	hkArray<hkbModifier *> m_array_hkbModifier;
-	hkbCustomTestGeneratorStruck m_Struck;
-	hkArray<hkbCustomTestGeneratorStruck> m_array_Struck;
+  virtual ~hkbCustomTestGenerator();
+  bool m_hkBool;
+  hkStringPtr m_string;
+  int32 m_int;
+  int8 m_hkInt8;
+  int16 m_hkInt16;
+  int32 m_hkInt32;
+  uint8 m_hkUint8;
+  uint16 m_hkUint16;
+  uint32 m_hkUint32;
+  float m_hkReal;
+  hkVector4 m_hkVector4;
+  hkQuaternion m_hkQuaternion;
+  hkpRigidBody *m_hkRigidBody;
+  int8 m_mode_hkInt8;
+  int16 m_mode_hkInt16;
+  int32 m_mode_hkInt32;
+  uint8 m_mode_hkUint8;
+  uint16 m_mode_hkUint16;
+  uint32 m_mode_hkUint32;
+  hkFlags m_flags_hkInt8;
+  hkFlags m_flags_hkInt16;
+  hkFlags m_flags_hkInt32;
+  hkFlags m_flags_hkUint8;
+  hkFlags m_flags_hkUint16;
+  hkFlags m_flags_hkUint32;
+  int32 m_myInt;
+  hkbGenerator *m_generator1;
+  hkbGenerator *m_generator2;
+  hkbModifier *m_modifier1;
+  hkbModifier *m_modifier2;
+  hkArray<bool> m_array_hkBool;
+  hkArray<int32> m_array_int;
+  hkArray<int8> m_array_hkInt8;
+  hkArray<int16> m_array_hkInt16;
+  hkArray<int32> m_array_hkInt32;
+  hkArray<int8> m_array_hkUint8;
+  hkArray<int16> m_array_hkUint16;
+  hkArray<int32> m_array_hkUint32;
+  hkArray<float> m_array_hkReal;
+  hkArray<hkbGenerator *> m_array_hkbGenerator;
+  hkArray<hkbModifier *> m_array_hkbModifier;
+  hkbCustomTestGeneratorStruck m_Struck;
+  hkArray<hkbCustomTestGeneratorStruck> m_array_Struck;
 };
 
-class hkbDemoConfigCharacterInfo : public hkReferencedObject
-{
+class hkbDemoConfigCharacterInfo : public hkReferencedObject {
 public:
-	virtual ~hkbDemoConfigCharacterInfo();
-	hkStringPtr m_overrideCharacterDataFilename;
-	hkStringPtr m_overrideBehaviorFilename;
-	hkVector4 m_initialPosition;
-	hkQuaternion m_initialRotation;
-	int32 m_modelUpAxis;
-	hkArray<int32> m_ragdollBoneLayers;
+  virtual ~hkbDemoConfigCharacterInfo();
+  hkStringPtr m_overrideCharacterDataFilename;
+  hkStringPtr m_overrideBehaviorFilename;
+  hkVector4 m_initialPosition;
+  hkQuaternion m_initialRotation;
+  int32 m_modelUpAxis;
+  hkArray<int32> m_ragdollBoneLayers;
 };
 
-class hkbDemoConfigStickVariableInfo
-{
+class hkbDemoConfigStickVariableInfo {
 public:
-	hkStringPtr m_variableName;
-	float m_minValue;
-	float m_maxValue;
-	float m_minStickValue;
-	float m_maxStickValue;
-	int8 m_stickAxis;
-	int8 m_stick;
-	bool m_complimentVariableValue;
-	bool m_negateVariableValue;
+  hkStringPtr m_variableName;
+  float m_minValue;
+  float m_maxValue;
+  float m_minStickValue;
+  float m_maxStickValue;
+  int8 m_stickAxis;
+  int8 m_stick;
+  bool m_complimentVariableValue;
+  bool m_negateVariableValue;
 };
 
-class hkbDemoConfigTerrainInfo
-{
+class hkbDemoConfigTerrainInfo {
 public:
-	hkStringPtr m_filename;
-	int32 m_layer;
-	int32 m_systemGroup;
-	bool m_createDisplayObjects;
-	hkpRigidBody *m_terrainRigidBody;
+  hkStringPtr m_filename;
+  int32 m_layer;
+  int32 m_systemGroup;
+  bool m_createDisplayObjects;
+  hkpRigidBody *m_terrainRigidBody;
 };
 
-class hkbDemoConfig : public hkReferencedObject
-{
+class hkbDemoConfig : public hkReferencedObject {
 public:
-	virtual ~hkbDemoConfig();
-	hkArray<hkbDemoConfigCharacterInfo *> m_characterInfo;
-	hkArray<hkbDemoConfigTerrainInfo> m_terrainInfo;
-	hkArray<int32> m_skinAttributeIndices;
-	int32 m_buttonPressToEventMap;
-	int32 m_buttonReleaseToEventMap;
-	int32 m_worldUpAxis;
-	int32 m_extraCharacterClones;
-	int32 m_numTracks;
-	float m_proxyHeight;
-	float m_proxyRadius;
-	float m_proxyOffset;
-	hkStringPtr m_rootPath;
-	hkStringPtr m_projectDataFilename;
-	bool m_useAttachments;
-	bool m_useProxy;
-	bool m_useSkyBox;
-	bool m_useTrackingCamera;
-	bool m_accumulateMotion;
-	bool m_testCloning;
-	bool m_useSplineCompression;
-	bool m_forceLoad;
-	hkArray<hkbDemoConfigStickVariableInfo> m_stickVariables;
-	int32 m_gamePadToRotateTerrainAboutItsAxisMap;
-	int32 m_gamePadToAddRemoveCharacterMap;
-	hkpGroupFilter *m_filter;
+  virtual ~hkbDemoConfig();
+  hkArray<hkbDemoConfigCharacterInfo *> m_characterInfo;
+  hkArray<hkbDemoConfigTerrainInfo> m_terrainInfo;
+  hkArray<int32> m_skinAttributeIndices;
+  int32 m_buttonPressToEventMap;
+  int32 m_buttonReleaseToEventMap;
+  int32 m_worldUpAxis;
+  int32 m_extraCharacterClones;
+  int32 m_numTracks;
+  float m_proxyHeight;
+  float m_proxyRadius;
+  float m_proxyOffset;
+  hkStringPtr m_rootPath;
+  hkStringPtr m_projectDataFilename;
+  bool m_useAttachments;
+  bool m_useProxy;
+  bool m_useSkyBox;
+  bool m_useTrackingCamera;
+  bool m_accumulateMotion;
+  bool m_testCloning;
+  bool m_useSplineCompression;
+  bool m_forceLoad;
+  hkArray<hkbDemoConfigStickVariableInfo> m_stickVariables;
+  int32 m_gamePadToRotateTerrainAboutItsAxisMap;
+  int32 m_gamePadToAddRemoveCharacterMap;
+  hkpGroupFilter *m_filter;
 };
 
-class hkbEventRaisedInfo : public hkReferencedObject
-{
+class hkbEventRaisedInfo : public hkReferencedObject {
 public:
-	virtual ~hkbEventRaisedInfo();
-	uint64 m_characterId;
-	hkStringPtr m_eventName;
-	bool m_raisedBySdk;
-	int32 m_senderId;
-	int32 m_padding;
+  virtual ~hkbEventRaisedInfo();
+  uint64 m_characterId;
+  hkStringPtr m_eventName;
+  bool m_raisedBySdk;
+  int32 m_senderId;
+  int32 m_padding;
 };
 
-class hkbFaceTargetModifier : public hkbModifier
-{
+class hkbFaceTargetModifier : public hkbModifier {
 public:
-	virtual ~hkbFaceTargetModifier();
-	hkbTarget *m_targetIn;
-	float m_offsetAngle;
-	bool m_onlyOnce;
-	bool m_done;
+  virtual ~hkbFaceTargetModifier();
+  hkbTarget *m_targetIn;
+  float m_offsetAngle;
+  bool m_onlyOnce;
+  bool m_done;
 };
 
-class hkbGravityModifier : public hkbModifier
-{
+class hkbGravityModifier : public hkbModifier {
 public:
-	virtual ~hkbGravityModifier();
-	hkVector4 m_initialVelocityInMS;
-	float m_gravityConstant;
-	hkVector4 m_currentVelocityInMS;
-	float m_secondsElapsed;
+  virtual ~hkbGravityModifier();
+  hkVector4 m_initialVelocityInMS;
+  float m_gravityConstant;
+  hkVector4 m_currentVelocityInMS;
+  float m_secondsElapsed;
 };
 
-class hkbHoldFromBlendingTransitionEffect : public hkbBlendingTransitionEffect
-{
+class hkbHoldFromBlendingTransitionEffect : public hkbBlendingTransitionEffect {
 public:
-	virtual ~hkbHoldFromBlendingTransitionEffect();
-	void *m_heldFromPose;
-	int32 m_heldFromPoseSize;
-	hkQsTransform m_heldWorldFromModel;
-	void *m_heldFromSkeleton;
+  virtual ~hkbHoldFromBlendingTransitionEffect();
+  void *m_heldFromPose;
+  int32 m_heldFromPoseSize;
+  hkQsTransform m_heldWorldFromModel;
+  void *m_heldFromSkeleton;
 };
 
-class hkbLinkedSymbolInfo : public hkReferencedObject
-{
+class hkbLinkedSymbolInfo : public hkReferencedObject {
 public:
-	virtual ~hkbLinkedSymbolInfo();
-	hkArray<hkStringPtr> m_eventNames;
-	hkArray<hkStringPtr> m_variableNames;
+  virtual ~hkbLinkedSymbolInfo();
+  hkArray<hkStringPtr> m_eventNames;
+  hkArray<hkStringPtr> m_variableNames;
 };
 
-class hkbMoveBoneTowardTargetModifier : public hkbModifier
-{
+class hkbMoveBoneTowardTargetModifier : public hkbModifier {
 public:
-	virtual ~hkbMoveBoneTowardTargetModifier();
-	hkbTarget *m_targetIn;
-	hkVector4 m_offsetInBoneSpace;
-	hkVector4 m_alignAxisBS;
-	hkVector4 m_targetAlignAxisTS;
-	hkVector4 m_alignWithCharacterForwardBS;
-	hkVector4 m_currentBonePositionOut;
-	hkQuaternion m_currentBoneRotationOut;
-	hkbEventProperty m_eventToSendWhenTargetReached;
-	hkbGenerator *m_childGenerator;
-	float m_duration;
-	int16 m_ragdollBoneIndex;
-	int16 m_animationBoneIndex;
-	int8 m_targetMode;
-	int8 m_alignMode;
-	bool m_useVelocityPrediction;
-	bool m_affectOrientation;
-	bool m_currentBoneIsValidOut;
-	void *m_targetInternal;
-	hkVector4 m_targetPointTS;
-	float m_time;
-	float m_timeSinceLastModify;
-	hkVector4 m_lastAnimBonePositionMS;
-	hkVector4 m_finalAnimBonePositionMS;
-	hkVector4 m_initialAnimBonePositionMS;
-	hkQuaternion m_finalAnimBoneOrientationMS;
-	hkQuaternion m_animationFromRagdoll;
-	hkQsTransform m_totalMotion;
-	hkQsTransform m_accumulatedMotion;
-	bool m_useAnimationData;
+  virtual ~hkbMoveBoneTowardTargetModifier();
+  hkbTarget *m_targetIn;
+  hkVector4 m_offsetInBoneSpace;
+  hkVector4 m_alignAxisBS;
+  hkVector4 m_targetAlignAxisTS;
+  hkVector4 m_alignWithCharacterForwardBS;
+  hkVector4 m_currentBonePositionOut;
+  hkQuaternion m_currentBoneRotationOut;
+  hkbEventProperty m_eventToSendWhenTargetReached;
+  hkbGenerator *m_childGenerator;
+  float m_duration;
+  int16 m_ragdollBoneIndex;
+  int16 m_animationBoneIndex;
+  int8 m_targetMode;
+  int8 m_alignMode;
+  bool m_useVelocityPrediction;
+  bool m_affectOrientation;
+  bool m_currentBoneIsValidOut;
+  void *m_targetInternal;
+  hkVector4 m_targetPointTS;
+  float m_time;
+  float m_timeSinceLastModify;
+  hkVector4 m_lastAnimBonePositionMS;
+  hkVector4 m_finalAnimBonePositionMS;
+  hkVector4 m_initialAnimBonePositionMS;
+  hkQuaternion m_finalAnimBoneOrientationMS;
+  hkQuaternion m_animationFromRagdoll;
+  hkQsTransform m_totalMotion;
+  hkQsTransform m_accumulatedMotion;
+  bool m_useAnimationData;
 };
 
-class hkbParticleSystemEventPayload : public hkbEventPayload
-{
+class hkbParticleSystemEventPayload : public hkbEventPayload {
 public:
-	virtual ~hkbParticleSystemEventPayload();
-	uint8 m_type;
-	int16 m_emitBoneIndex;
-	hkVector4 m_offset;
-	hkVector4 m_direction;
-	int32 m_numParticles;
-	float m_speed;
+  virtual ~hkbParticleSystemEventPayload();
+  uint8 m_type;
+  int16 m_emitBoneIndex;
+  hkVector4 m_offset;
+  hkVector4 m_direction;
+  int32 m_numParticles;
+  float m_speed;
 };
 
-class hkbGeneratorOutputListener : public hkReferencedObject
-{
+class hkbGeneratorOutputListener : public hkReferencedObject {
 public:
 };
 
-class hkbPoseStoringGeneratorOutputListenerStoredPose : public hkReferencedObject
-{
+class hkbPoseStoringGeneratorOutputListenerStoredPose
+    : public hkReferencedObject {
 public:
-	virtual ~hkbPoseStoringGeneratorOutputListenerStoredPose();
-	hkbNode *m_node;
-	hkArray<hkQsTransform> m_pose;
-	hkQsTransform m_worldFromModel;
-	bool m_isPoseValid;
+  virtual ~hkbPoseStoringGeneratorOutputListenerStoredPose();
+  hkbNode *m_node;
+  hkArray<hkQsTransform> m_pose;
+  hkQsTransform m_worldFromModel;
+  bool m_isPoseValid;
 };
 
-class hkbPoseStoringGeneratorOutputListener : public hkbGeneratorOutputListener
-{
+class hkbPoseStoringGeneratorOutputListener
+    : public hkbGeneratorOutputListener {
 public:
-	virtual ~hkbPoseStoringGeneratorOutputListener();
-	hkArray<hkbPoseStoringGeneratorOutputListenerStoredPose *> m_storedPoses;
-	bool m_dirty;
-	void *m_nodeToIndexMap;
+  virtual ~hkbPoseStoringGeneratorOutputListener();
+  hkArray<hkbPoseStoringGeneratorOutputListenerStoredPose *> m_storedPoses;
+  bool m_dirty;
+  void *m_nodeToIndexMap;
 };
 
-class hkbRaiseEventCommand : public hkReferencedObject
-{
+class hkbRaiseEventCommand : public hkReferencedObject {
 public:
-	virtual ~hkbRaiseEventCommand();
-	uint64 m_characterId;
-	bool m_global;
-	int32 m_externalId;
+  virtual ~hkbRaiseEventCommand();
+  uint64 m_characterId;
+  bool m_global;
+  int32 m_externalId;
 };
 
-class hkbReachModifierHand
-{
+class hkbReachModifierHand {
 public:
-	hkVector4 m_targetOrSensingPosition;
-	hkVector4 m_targetBackHandNormal;
-	float m_sensingRadius;
-	int16 m_boneIndex;
-	int16 m_handIkTrackIndex;
+  hkVector4 m_targetOrSensingPosition;
+  hkVector4 m_targetBackHandNormal;
+  float m_sensingRadius;
+  int16 m_boneIndex;
+  int16 m_handIkTrackIndex;
 };
 
-class hkbReachModifier : public hkbModifier
-{
+class hkbReachModifier : public hkbModifier {
 public:
-	virtual ~hkbReachModifier();
-	hkArray<hkbReachModifierHand> m_hands;
-	float m_newTargetGain;
-	float m_noTargetGain;
-	float m_targetGain;
-	float m_fadeOutDuration;
-	int32 m_raycastLayer;
-	uint32 m_sensingPropertyKey;
-	int8 m_reachMode;
-	bool m_ignoreMySystemGroup;
-	float m_extrapolate;
-	hkArray<void> m_internalHandData;
-	float m_timeLapse;
+  virtual ~hkbReachModifier();
+  hkArray<hkbReachModifierHand> m_hands;
+  float m_newTargetGain;
+  float m_noTargetGain;
+  float m_targetGain;
+  float m_fadeOutDuration;
+  int32 m_raycastLayer;
+  uint32 m_sensingPropertyKey;
+  int8 m_reachMode;
+  bool m_ignoreMySystemGroup;
+  float m_extrapolate;
+  hkArray<void> m_internalHandData;
+  float m_timeLapse;
 };
 
-class hkbReachTowardTargetModifierHand
-{
+class hkbReachTowardTargetModifierHand {
 public:
-	int16 m_shoulderIndex;
-	bool m_isEnabled;
+  int16 m_shoulderIndex;
+  bool m_isEnabled;
 };
 
-class hkbReachTowardTargetModifier : public hkbModifier
-{
+class hkbReachTowardTargetModifier : public hkbModifier {
 public:
-	virtual ~hkbReachTowardTargetModifier();
-	hkbReachTowardTargetModifierHand m_leftHand;
-	hkbReachTowardTargetModifierHand m_rightHand;
-	hkbTarget *m_targetIn;
-	float m_distanceBetweenHands;
-	float m_reachDistance;
-	float m_fadeInGainSpeed;
-	float m_fadeOutGainSpeed;
-	float m_fadeOutDuration;
-	float m_targetChangeSpeed;
-	bool m_holdTarget;
-	bool m_reachPastTarget;
-	bool m_giveUpIfNoTarget;
-	void *m_targetRB;
-	hkVector4 m_prevTargetInMS;
-	float m_currentGain;
-	float m_timeSinceLastModify;
-	int8 m_fadeState;
-	bool m_haveGivenUp;
-	bool m_isTherePrevTarget;
+  virtual ~hkbReachTowardTargetModifier();
+  hkbReachTowardTargetModifierHand m_leftHand;
+  hkbReachTowardTargetModifierHand m_rightHand;
+  hkbTarget *m_targetIn;
+  float m_distanceBetweenHands;
+  float m_reachDistance;
+  float m_fadeInGainSpeed;
+  float m_fadeOutGainSpeed;
+  float m_fadeOutDuration;
+  float m_targetChangeSpeed;
+  bool m_holdTarget;
+  bool m_reachPastTarget;
+  bool m_giveUpIfNoTarget;
+  void *m_targetRB;
+  hkVector4 m_prevTargetInMS;
+  float m_currentGain;
+  float m_timeSinceLastModify;
+  int8 m_fadeState;
+  bool m_haveGivenUp;
+  bool m_isTherePrevTarget;
 };
 
-class hkbSetBehaviorCommand : public hkReferencedObject
-{
+class hkbSetBehaviorCommand : public hkReferencedObject {
 public:
-	virtual ~hkbSetBehaviorCommand();
-	uint64 m_characterId;
-	hkbBehaviorGraph *m_behavior;
-	hkbGenerator *m_rootGenerator;
-	hkArray<hkbBehaviorGraph *> m_referencedBehaviors;
-	int32 m_startStateIndex;
-	bool m_randomizeSimulation;
-	int32 m_padding;
+  virtual ~hkbSetBehaviorCommand();
+  uint64 m_characterId;
+  hkbBehaviorGraph *m_behavior;
+  hkbGenerator *m_rootGenerator;
+  hkArray<hkbBehaviorGraph *> m_referencedBehaviors;
+  int32 m_startStateIndex;
+  bool m_randomizeSimulation;
+  int32 m_padding;
 };
 
-class hkbSetLocalTimeOfClipGeneratorCommand : public hkReferencedObject
-{
+class hkbSetLocalTimeOfClipGeneratorCommand : public hkReferencedObject {
 public:
-	virtual ~hkbSetLocalTimeOfClipGeneratorCommand();
-	uint64 m_characterId;
-	float m_localTime;
-	int16 m_nodeId;
+  virtual ~hkbSetLocalTimeOfClipGeneratorCommand();
+  uint64 m_characterId;
+  float m_localTime;
+  int16 m_nodeId;
 };
 
-class hkbSetNodePropertyCommand : public hkReferencedObject
-{
+class hkbSetNodePropertyCommand : public hkReferencedObject {
 public:
-	virtual ~hkbSetNodePropertyCommand();
-	uint64 m_characterId;
-	hkStringPtr m_nodeName;
-	hkStringPtr m_propertyName;
-	hkbVariableValue m_propertyValue;
-	int32 m_padding;
+  virtual ~hkbSetNodePropertyCommand();
+  uint64 m_characterId;
+  hkStringPtr m_nodeName;
+  hkStringPtr m_propertyName;
+  hkbVariableValue m_propertyValue;
+  int32 m_padding;
 };
 
-class hkbSetWordVariableCommand : public hkReferencedObject
-{
+class hkbSetWordVariableCommand : public hkReferencedObject {
 public:
-	virtual ~hkbSetWordVariableCommand();
-	hkVector4 m_quadValue;
-	uint64 m_characterId;
-	int32 m_variableId;
-	hkbVariableValue m_value;
-	uint8 m_type;
-	bool m_global;
+  virtual ~hkbSetWordVariableCommand();
+  hkVector4 m_quadValue;
+  uint64 m_characterId;
+  int32 m_variableId;
+  hkbVariableValue m_value;
+  uint8 m_type;
+  bool m_global;
 };
 
-class hkbSimulationControlCommand : public hkReferencedObject
-{
+class hkbSimulationControlCommand : public hkReferencedObject {
 public:
-	virtual ~hkbSimulationControlCommand();
-	uint8 m_command;
+  virtual ~hkbSimulationControlCommand();
+  uint8 m_command;
 };
 
-class hkbSimulationStateInfo : public hkReferencedObject
-{
+class hkbSimulationStateInfo : public hkReferencedObject {
 public:
-	virtual ~hkbSimulationStateInfo();
-	uint8 m_simulationState;
+  virtual ~hkbSimulationStateInfo();
+  uint8 m_simulationState;
 };
 
-class hkbStateDependentModifier : public hkbModifier
-{
+class hkbStateDependentModifier : public hkbModifier {
 public:
-	virtual ~hkbStateDependentModifier();
-	bool m_applyModifierDuringTransition;
-	hkArray<int32> m_stateIds;
-	hkbModifier *m_modifier;
-	bool m_isActive;
-	hkbStateMachine *m_stateMachine;
+  virtual ~hkbStateDependentModifier();
+  bool m_applyModifierDuringTransition;
+  hkArray<int32> m_stateIds;
+  hkbModifier *m_modifier;
+  bool m_isActive;
+  hkbStateMachine *m_stateMachine;
 };
 
-class hkbTargetRigidBodyModifier : public hkbModifier
-{
+class hkbTargetRigidBodyModifier : public hkbModifier {
 public:
-	virtual ~hkbTargetRigidBodyModifier();
-	hkbTarget *m_targetOut;
-	int8 m_targetMode;
-	int32 m_sensingLayer;
-	bool m_targetOnlyOnce;
-	bool m_ignoreMySystemGroup;
-	float m_maxTargetDistance;
-	float m_maxTargetHeightAboveSensor;
-	float m_closeToTargetDistanceThreshold;
-	int8 m_targetAngleMode;
-	int8 m_targetDistanceMode;
-	float m_maxAngleToTarget;
-	int16 m_sensorRagdollBoneIndex;
-	int16 m_sensorAnimationBoneIndex;
-	int16 m_closeToTargetRagdollBoneIndex;
-	int16 m_closeToTargetAnimationBoneIndex;
-	hkVector4 m_sensorOffsetInBoneSpace;
-	hkVector4 m_closeToTargetOffsetInBoneSpace;
-	hkVector4 m_sensorDirectionBS;
-	int8 m_eventMode;
-	uint32 m_sensingPropertyKey;
-	bool m_sensorInWS;
-	hkbEventProperty m_eventToSend;
-	hkbEventProperty m_eventToSendToTarget;
-	hkbEventProperty m_closeToTargetEvent;
-	bool m_useVelocityPrediction;
-	bool m_targetOnlySpheres;
-	bool m_isCloseToTargetOut;
-	int8 m_targetPriority;
-	void *m_targetRb;
-	float m_targetDistance;
-	float m_timeSinceLastModify;
-	bool m_eventHasBeenSent;
-	bool m_closeToTargetEventHasBeenSent;
-	bool m_isActive;
+  virtual ~hkbTargetRigidBodyModifier();
+  hkbTarget *m_targetOut;
+  int8 m_targetMode;
+  int32 m_sensingLayer;
+  bool m_targetOnlyOnce;
+  bool m_ignoreMySystemGroup;
+  float m_maxTargetDistance;
+  float m_maxTargetHeightAboveSensor;
+  float m_closeToTargetDistanceThreshold;
+  int8 m_targetAngleMode;
+  int8 m_targetDistanceMode;
+  float m_maxAngleToTarget;
+  int16 m_sensorRagdollBoneIndex;
+  int16 m_sensorAnimationBoneIndex;
+  int16 m_closeToTargetRagdollBoneIndex;
+  int16 m_closeToTargetAnimationBoneIndex;
+  hkVector4 m_sensorOffsetInBoneSpace;
+  hkVector4 m_closeToTargetOffsetInBoneSpace;
+  hkVector4 m_sensorDirectionBS;
+  int8 m_eventMode;
+  uint32 m_sensingPropertyKey;
+  bool m_sensorInWS;
+  hkbEventProperty m_eventToSend;
+  hkbEventProperty m_eventToSendToTarget;
+  hkbEventProperty m_closeToTargetEvent;
+  bool m_useVelocityPrediction;
+  bool m_targetOnlySpheres;
+  bool m_isCloseToTargetOut;
+  int8 m_targetPriority;
+  void *m_targetRb;
+  float m_targetDistance;
+  float m_timeSinceLastModify;
+  bool m_eventHasBeenSent;
+  bool m_closeToTargetEventHasBeenSent;
+  bool m_isActive;
 };
 
-class hkbTestStateChooser : public hkbStateChooser
-{
+class hkbTestStateChooser : public hkbStateChooser {
 public:
-	virtual ~hkbTestStateChooser();
-	int32 m_int;
-	float m_real;
-	hkStringPtr m_string;
+  virtual ~hkbTestStateChooser();
+  int32 m_int;
+  float m_real;
+  hkStringPtr m_string;
 };
 
-class BGSGamebryoSequenceGenerator : public hkbGenerator
-{
+class BGSGamebryoSequenceGenerator : public hkbGenerator {
 public:
-	virtual ~BGSGamebryoSequenceGenerator();
-	char *m_pSequence;
-	int8 m_eBlendModeFunction;
-	float m_fPercent;
-	hkArray<void> m_events;
-	float m_fTime;
-	bool m_bDelayedActivate;
-	bool m_bLooping;
+  virtual ~BGSGamebryoSequenceGenerator();
+  char *m_pSequence;
+  int8 m_eBlendModeFunction;
+  float m_fPercent;
+  hkArray<void> m_events;
+  float m_fTime;
+  bool m_bDelayedActivate;
+  bool m_bLooping;
 };
 
-class BSBoneSwitchGeneratorBoneData : public hkbBindable
-{
+class BSBoneSwitchGeneratorBoneData : public hkbBindable {
 public:
-	virtual ~BSBoneSwitchGeneratorBoneData();
-	hkbGenerator *m_pGenerator;
-	hkbBoneWeightArray *m_spBoneWeight;
+  virtual ~BSBoneSwitchGeneratorBoneData();
+  hkbGenerator *m_pGenerator;
+  hkbBoneWeightArray *m_spBoneWeight;
 };
 
-class BSBoneSwitchGenerator : public hkbGenerator
-{
+class BSBoneSwitchGenerator : public hkbGenerator {
 public:
-	virtual ~BSBoneSwitchGenerator();
-	hkbGenerator *m_pDefaultGenerator;
-	hkArray<BSBoneSwitchGeneratorBoneData *> m_ChildrenA;
+  virtual ~BSBoneSwitchGenerator();
+  hkbGenerator *m_pDefaultGenerator;
+  hkArray<BSBoneSwitchGeneratorBoneData *> m_ChildrenA;
 };
 
-class BSComputeAddBoneAnimModifier : public hkbModifier
-{
+class BSComputeAddBoneAnimModifier : public hkbModifier {
 public:
-	virtual ~BSComputeAddBoneAnimModifier();
-	int16 m_boneIndex;
-	hkVector4 m_translationLSOut;
-	hkQuaternion m_rotationLSOut;
-	hkVector4 m_scaleLSOut;
-	void *m_pSkeletonMemory;
+  virtual ~BSComputeAddBoneAnimModifier();
+  int16 m_boneIndex;
+  hkVector4 m_translationLSOut;
+  hkQuaternion m_rotationLSOut;
+  hkVector4 m_scaleLSOut;
+  void *m_pSkeletonMemory;
 };
 
-class BSCyclicBlendTransitionGenerator : public hkbGenerator
-{
+class BSCyclicBlendTransitionGenerator : public hkbGenerator {
 public:
-	virtual ~BSCyclicBlendTransitionGenerator();
-	hkbGenerator *m_pBlenderGenerator;
-	hkbEventProperty m_EventToFreezeBlendValue;
-	hkbEventProperty m_EventToCrossBlend;
-	float m_fBlendParameter;
-	float m_fTransitionDuration;
-	int8 m_eBlendCurve;
-	void *m_pTransitionBlenderGenerator;
-	void *m_pTransitionEffect;
-	int8 m_currentMode;
+  virtual ~BSCyclicBlendTransitionGenerator();
+  hkbGenerator *m_pBlenderGenerator;
+  hkbEventProperty m_EventToFreezeBlendValue;
+  hkbEventProperty m_EventToCrossBlend;
+  float m_fBlendParameter;
+  float m_fTransitionDuration;
+  int8 m_eBlendCurve;
+  void *m_pTransitionBlenderGenerator;
+  void *m_pTransitionEffect;
+  int8 m_currentMode;
 };
 
-class BSDecomposeVectorModifier : public hkbModifier
-{
+class BSDecomposeVectorModifier : public hkbModifier {
 public:
-	virtual ~BSDecomposeVectorModifier();
-	hkVector4 m_vector;
-	float m_x;
-	float m_y;
-	float m_z;
-	float m_w;
+  virtual ~BSDecomposeVectorModifier();
+  hkVector4 m_vector;
+  float m_x;
+  float m_y;
+  float m_z;
+  float m_w;
 };
 
-class BSDirectAtModifier : public hkbModifier
-{
+class BSDirectAtModifier : public hkbModifier {
 public:
-	virtual ~BSDirectAtModifier();
-	bool m_directAtTarget;
-	int16 m_sourceBoneIndex;
-	int16 m_startBoneIndex;
-	int16 m_endBoneIndex;
-	float m_limitHeadingDegrees;
-	float m_limitPitchDegrees;
-	float m_offsetHeadingDegrees;
-	float m_offsetPitchDegrees;
-	float m_onGain;
-	float m_offGain;
-	hkVector4 m_targetLocation;
-	uint32 m_userInfo;
-	bool m_directAtCamera;
-	float m_directAtCameraX;
-	float m_directAtCameraY;
-	float m_directAtCameraZ;
-	bool m_active;
-	float m_currentHeadingOffset;
-	float m_currentPitchOffset;
-	float m_timeStep;
-	void *m_pSkeletonMemory;
-	bool m_hasTarget;
-	hkVector4 m_directAtTargetLocation;
-	hkArray<void> m_boneChainIndices;
+  virtual ~BSDirectAtModifier();
+  bool m_directAtTarget;
+  int16 m_sourceBoneIndex;
+  int16 m_startBoneIndex;
+  int16 m_endBoneIndex;
+  float m_limitHeadingDegrees;
+  float m_limitPitchDegrees;
+  float m_offsetHeadingDegrees;
+  float m_offsetPitchDegrees;
+  float m_onGain;
+  float m_offGain;
+  hkVector4 m_targetLocation;
+  uint32 m_userInfo;
+  bool m_directAtCamera;
+  float m_directAtCameraX;
+  float m_directAtCameraY;
+  float m_directAtCameraZ;
+  bool m_active;
+  float m_currentHeadingOffset;
+  float m_currentPitchOffset;
+  float m_timeStep;
+  void *m_pSkeletonMemory;
+  bool m_hasTarget;
+  hkVector4 m_directAtTargetLocation;
+  hkArray<void> m_boneChainIndices;
 };
 
-class BSDistTriggerModifier : public hkbModifier
-{
+class BSDistTriggerModifier : public hkbModifier {
 public:
-	virtual ~BSDistTriggerModifier();
-	hkVector4 m_targetPosition;
-	float m_distance;
-	float m_distanceTrigger;
-	hkbEventProperty m_triggerEvent;
+  virtual ~BSDistTriggerModifier();
+  hkVector4 m_targetPosition;
+  float m_distance;
+  float m_distanceTrigger;
+  hkbEventProperty m_triggerEvent;
 };
 
-class BSEventEveryNEventsModifier : public hkbModifier
-{
+class BSEventEveryNEventsModifier : public hkbModifier {
 public:
-	virtual ~BSEventEveryNEventsModifier();
-	hkbEventProperty m_eventToCheckFor;
-	hkbEventProperty m_eventToSend;
-	int8 m_numberOfEventsBeforeSend;
-	int8 m_minimumNumberOfEventsBeforeSend;
-	bool m_randomizeNumberOfEvents;
-	int32 m_numberOfEventsSeen;
-	int8 m_calculatedNumberOfEventsBeforeSend;
+  virtual ~BSEventEveryNEventsModifier();
+  hkbEventProperty m_eventToCheckFor;
+  hkbEventProperty m_eventToSend;
+  int8 m_numberOfEventsBeforeSend;
+  int8 m_minimumNumberOfEventsBeforeSend;
+  bool m_randomizeNumberOfEvents;
+  int32 m_numberOfEventsSeen;
+  int8 m_calculatedNumberOfEventsBeforeSend;
 };
 
-class BSEventOnDeactivateModifier : public hkbModifier
-{
+class BSEventOnDeactivateModifier : public hkbModifier {
 public:
-	virtual ~BSEventOnDeactivateModifier();
-	hkbEventProperty m_event;
+  virtual ~BSEventOnDeactivateModifier();
+  hkbEventProperty m_event;
 };
 
-class BSEventOnFalseToTrueModifier : public hkbModifier
-{
+class BSEventOnFalseToTrueModifier : public hkbModifier {
 public:
-	virtual ~BSEventOnFalseToTrueModifier();
-	bool m_bEnableEvent1;
-	bool m_bVariableToTest1;
-	hkbEventProperty m_EventToSend1;
-	bool m_bEnableEvent2;
-	bool m_bVariableToTest2;
-	hkbEventProperty m_EventToSend2;
-	bool m_bEnableEvent3;
-	bool m_bVariableToTest3;
-	hkbEventProperty m_EventToSend3;
-	bool m_bSlot1ActivatedLastFrame;
-	bool m_bSlot2ActivatedLastFrame;
-	bool m_bSlot3ActivatedLastFrame;
+  virtual ~BSEventOnFalseToTrueModifier();
+  bool m_bEnableEvent1;
+  bool m_bVariableToTest1;
+  hkbEventProperty m_EventToSend1;
+  bool m_bEnableEvent2;
+  bool m_bVariableToTest2;
+  hkbEventProperty m_EventToSend2;
+  bool m_bEnableEvent3;
+  bool m_bVariableToTest3;
+  hkbEventProperty m_EventToSend3;
+  bool m_bSlot1ActivatedLastFrame;
+  bool m_bSlot2ActivatedLastFrame;
+  bool m_bSlot3ActivatedLastFrame;
 };
 
-class BSGetTimeStepModifier : public hkbModifier
-{
+class BSGetTimeStepModifier : public hkbModifier {
 public:
-	virtual ~BSGetTimeStepModifier();
-	float m_timeStep;
+  virtual ~BSGetTimeStepModifier();
+  float m_timeStep;
 };
 
-class BSIStateManagerModifierBSiStateData
-{
+class BSIStateManagerModifierBSiStateData {
 public:
-	hkbGenerator *m_pStateMachine;
-	int32 m_StateID;
-	int32 m_iStateToSetAs;
+  hkbGenerator *m_pStateMachine;
+  int32 m_StateID;
+  int32 m_iStateToSetAs;
 };
 
-class BSIStateManagerModifierBSIStateManagerStateListener : public hkbStateListener
-{
+class BSIStateManagerModifierBSIStateManagerStateListener
+    : public hkbStateListener {
 public:
-	virtual ~BSIStateManagerModifierBSIStateManagerStateListener();
-	void *m_pStateManager;
+  virtual ~BSIStateManagerModifierBSIStateManagerStateListener();
+  void *m_pStateManager;
 };
 
-class BSIStateManagerModifier : public hkbModifier
-{
+class BSIStateManagerModifier : public hkbModifier {
 public:
-	virtual ~BSIStateManagerModifier();
-	int32 m_iStateVar;
-	hkArray<BSIStateManagerModifierBSiStateData> m_stateData;
-	BSIStateManagerModifierBSIStateManagerStateListener m_myStateListener;
+  virtual ~BSIStateManagerModifier();
+  int32 m_iStateVar;
+  hkArray<BSIStateManagerModifierBSiStateData> m_stateData;
+  BSIStateManagerModifierBSIStateManagerStateListener m_myStateListener;
 };
 
-class BSInterpValueModifier : public hkbModifier
-{
+class BSInterpValueModifier : public hkbModifier {
 public:
-	virtual ~BSInterpValueModifier();
-	float m_source;
-	float m_target;
-	float m_result;
-	float m_gain;
-	float m_timeStep;
+  virtual ~BSInterpValueModifier();
+  float m_source;
+  float m_target;
+  float m_result;
+  float m_gain;
+  float m_timeStep;
 };
 
-class BSIsActiveModifier : public hkbModifier
-{
+class BSIsActiveModifier : public hkbModifier {
 public:
-	virtual ~BSIsActiveModifier();
-	bool m_bIsActive0;
-	bool m_bInvertActive0;
-	bool m_bIsActive1;
-	bool m_bInvertActive1;
-	bool m_bIsActive2;
-	bool m_bInvertActive2;
-	bool m_bIsActive3;
-	bool m_bInvertActive3;
-	bool m_bIsActive4;
-	bool m_bInvertActive4;
+  virtual ~BSIsActiveModifier();
+  bool m_bIsActive0;
+  bool m_bInvertActive0;
+  bool m_bIsActive1;
+  bool m_bInvertActive1;
+  bool m_bIsActive2;
+  bool m_bInvertActive2;
+  bool m_bIsActive3;
+  bool m_bInvertActive3;
+  bool m_bIsActive4;
+  bool m_bInvertActive4;
 };
 
-class BSLimbIKModifier : public hkbModifier
-{
+class BSLimbIKModifier : public hkbModifier {
 public:
-	virtual ~BSLimbIKModifier();
-	float m_limitAngleDegrees;
-	float m_currentAngle;
-	int16 m_startBoneIndex;
-	int16 m_endBoneIndex;
-	float m_gain;
-	float m_boneRadius;
-	float m_castOffset;
-	float m_timeStep;
-	void *m_pSkeletonMemory;
+  virtual ~BSLimbIKModifier();
+  float m_limitAngleDegrees;
+  float m_currentAngle;
+  int16 m_startBoneIndex;
+  int16 m_endBoneIndex;
+  float m_gain;
+  float m_boneRadius;
+  float m_castOffset;
+  float m_timeStep;
+  void *m_pSkeletonMemory;
 };
 
-class BSLookAtModifierBoneData
-{
+class BSLookAtModifierBoneData {
 public:
-	int16 m_index;
-	hkVector4 m_fwdAxisLS;
-	float m_limitAngleDegrees;
-	float m_onGain;
-	float m_offGain;
-	bool m_enabled;
-	hkVector4 m_currentFwdAxisLS;
+  int16 m_index;
+  hkVector4 m_fwdAxisLS;
+  float m_limitAngleDegrees;
+  float m_onGain;
+  float m_offGain;
+  bool m_enabled;
+  hkVector4 m_currentFwdAxisLS;
 };
 
-class BSLookAtModifier : public hkbModifier
-{
+class BSLookAtModifier : public hkbModifier {
 public:
-	virtual ~BSLookAtModifier();
-	bool m_lookAtTarget;
-	hkArray<BSLookAtModifierBoneData> m_bones;
-	hkArray<BSLookAtModifierBoneData> m_eyeBones;
-	float m_limitAngleDegrees;
-	float m_limitAngleThresholdDegrees;
-	bool m_continueLookOutsideOfLimit;
-	float m_onGain;
-	float m_offGain;
-	bool m_useBoneGains;
-	hkVector4 m_targetLocation;
-	bool m_targetOutsideLimits;
-	hkbEventProperty m_targetOutOfLimitEvent;
-	bool m_lookAtCamera;
-	float m_lookAtCameraX;
-	float m_lookAtCameraY;
-	float m_lookAtCameraZ;
-	float m_timeStep;
-	bool m_ballBonesValid;
-	void *m_pSkeletonMemory;
+  virtual ~BSLookAtModifier();
+  bool m_lookAtTarget;
+  hkArray<BSLookAtModifierBoneData> m_bones;
+  hkArray<BSLookAtModifierBoneData> m_eyeBones;
+  float m_limitAngleDegrees;
+  float m_limitAngleThresholdDegrees;
+  bool m_continueLookOutsideOfLimit;
+  float m_onGain;
+  float m_offGain;
+  bool m_useBoneGains;
+  hkVector4 m_targetLocation;
+  bool m_targetOutsideLimits;
+  hkbEventProperty m_targetOutOfLimitEvent;
+  bool m_lookAtCamera;
+  float m_lookAtCameraX;
+  float m_lookAtCameraY;
+  float m_lookAtCameraZ;
+  float m_timeStep;
+  bool m_ballBonesValid;
+  void *m_pSkeletonMemory;
 };
 
-class BSModifyOnceModifier : public hkbModifier
-{
+class BSModifyOnceModifier : public hkbModifier {
 public:
-	virtual ~BSModifyOnceModifier();
-	hkbModifier *m_pOnActivateModifier;
-	hkbModifier *m_pOnDeactivateModifier;
+  virtual ~BSModifyOnceModifier();
+  hkbModifier *m_pOnActivateModifier;
+  hkbModifier *m_pOnDeactivateModifier;
 };
 
-class BSOffsetAnimationGenerator : public hkbGenerator
-{
+class BSOffsetAnimationGenerator : public hkbGenerator {
 public:
-	virtual ~BSOffsetAnimationGenerator();
-	hkbGenerator *m_pDefaultGenerator;
-	hkbGenerator *m_pOffsetClipGenerator;
-	float m_fOffsetVariable;
-	float m_fOffsetRangeStart;
-	float m_fOffsetRangeEnd;
-	hkArray<void> m_BoneOffsetA;
-	hkArray<void> m_BoneIndexA;
-	float m_fCurrentPercentage;
-	uint32 m_iCurrentFrame;
-	bool m_bZeroOffset;
-	bool m_bOffsetValid;
+  virtual ~BSOffsetAnimationGenerator();
+  hkbGenerator *m_pDefaultGenerator;
+  hkbGenerator *m_pOffsetClipGenerator;
+  float m_fOffsetVariable;
+  float m_fOffsetRangeStart;
+  float m_fOffsetRangeEnd;
+  hkArray<void> m_BoneOffsetA;
+  hkArray<void> m_BoneIndexA;
+  float m_fCurrentPercentage;
+  uint32 m_iCurrentFrame;
+  bool m_bZeroOffset;
+  bool m_bOffsetValid;
 };
 
-class BSPassByTargetTriggerModifier : public hkbModifier
-{
+class BSPassByTargetTriggerModifier : public hkbModifier {
 public:
-	virtual ~BSPassByTargetTriggerModifier();
-	hkVector4 m_targetPosition;
-	float m_radius;
-	hkVector4 m_movementDirection;
-	hkbEventProperty m_triggerEvent;
-	bool m_targetPassed;
+  virtual ~BSPassByTargetTriggerModifier();
+  hkVector4 m_targetPosition;
+  float m_radius;
+  hkVector4 m_movementDirection;
+  hkbEventProperty m_triggerEvent;
+  bool m_targetPassed;
 };
 
-class BSRagdollContactListenerModifier : public hkbModifier
-{
+class BSRagdollContactListenerModifier : public hkbModifier {
 public:
-	virtual ~BSRagdollContactListenerModifier();
-	hkbEventProperty m_contactEvent;
-	hkbBoneIndexArray *m_bones;
-	bool m_throwEvent;
-	hkArray<void *> m_ragdollRigidBodies;
+  virtual ~BSRagdollContactListenerModifier();
+  hkbEventProperty m_contactEvent;
+  hkbBoneIndexArray *m_bones;
+  bool m_throwEvent;
+  hkArray<void *> m_ragdollRigidBodies;
 };
 
-class BSSpeedSamplerModifier : public hkbModifier
-{
+class BSSpeedSamplerModifier : public hkbModifier {
 public:
-	virtual ~BSSpeedSamplerModifier();
-	int32 m_state;
-	float m_direction;
-	float m_goalSpeed;
-	float m_speedOut;
+  virtual ~BSSpeedSamplerModifier();
+  int32 m_state;
+  float m_direction;
+  float m_goalSpeed;
+  float m_speedOut;
 };
 
-class BSSynchronizedClipGenerator : public hkbGenerator
-{
+class BSSynchronizedClipGenerator : public hkbGenerator {
 public:
-	virtual ~BSSynchronizedClipGenerator();
-	hkbGenerator *m_pClipGenerator;
-	char *m_SyncAnimPrefix;
-	bool m_bSyncClipIgnoreMarkPlacement;
-	float m_fGetToMarkTime;
-	float m_fMarkErrorThreshold;
-	bool m_bLeadCharacter;
-	bool m_bReorientSupportChar;
-	bool m_bApplyMotionFromRoot;
-	void *m_pSyncScene;
-	hkQsTransform m_StartMarkWS;
-	hkQsTransform m_EndMarkWS;
-	hkQsTransform m_StartMarkMS;
-	float m_fCurrentLerp;
-	void *m_pLocalSyncBinding;
-	void *m_pEventMap;
-	int16 m_sAnimationBindingIndex;
-	bool m_bAtMark;
-	bool m_bAllCharactersInScene;
-	bool m_bAllCharactersAtMarks;
+  virtual ~BSSynchronizedClipGenerator();
+  hkbGenerator *m_pClipGenerator;
+  char *m_SyncAnimPrefix;
+  bool m_bSyncClipIgnoreMarkPlacement;
+  float m_fGetToMarkTime;
+  float m_fMarkErrorThreshold;
+  bool m_bLeadCharacter;
+  bool m_bReorientSupportChar;
+  bool m_bApplyMotionFromRoot;
+  void *m_pSyncScene;
+  hkQsTransform m_StartMarkWS;
+  hkQsTransform m_EndMarkWS;
+  hkQsTransform m_StartMarkMS;
+  float m_fCurrentLerp;
+  void *m_pLocalSyncBinding;
+  void *m_pEventMap;
+  int16 m_sAnimationBindingIndex;
+  bool m_bAtMark;
+  bool m_bAllCharactersInScene;
+  bool m_bAllCharactersAtMarks;
 };
 
-class BSTimerModifier : public hkbModifier
-{
+class BSTimerModifier : public hkbModifier {
 public:
-	virtual ~BSTimerModifier();
-	float m_alarmTimeSeconds;
-	hkbEventProperty m_alarmEvent;
-	bool m_resetAlarm;
-	float m_secondsElapsed;
+  virtual ~BSTimerModifier();
+  float m_alarmTimeSeconds;
+  hkbEventProperty m_alarmEvent;
+  bool m_resetAlarm;
+  float m_secondsElapsed;
 };
 
-class BSTweenerModifier : public hkbModifier
-{
+class BSTweenerModifier : public hkbModifier {
 public:
-	virtual ~BSTweenerModifier();
-	bool m_tweenPosition;
-	bool m_tweenRotation;
-	bool m_useTweenDuration;
-	float m_tweenDuration;
-	hkVector4 m_targetPosition;
-	hkQuaternion m_targetRotation;
-	float m_duration;
-	hkQsTransform m_startTransform;
-	float m_time;
+  virtual ~BSTweenerModifier();
+  bool m_tweenPosition;
+  bool m_tweenRotation;
+  bool m_useTweenDuration;
+  float m_tweenDuration;
+  hkVector4 m_targetPosition;
+  hkQuaternion m_targetRotation;
+  float m_duration;
+  hkQsTransform m_startTransform;
+  float m_time;
 };
 
-class BSiStateTaggingGenerator : public hkbGenerator
-{
+class BSiStateTaggingGenerator : public hkbGenerator {
 public:
-	virtual ~BSiStateTaggingGenerator();
-	hkbGenerator *m_pDefaultGenerator;
-	int32 m_iStateToSetAs;
-	int32 m_iPriority;
+  virtual ~BSiStateTaggingGenerator();
+  hkbGenerator *m_pDefaultGenerator;
+  int32 m_iStateToSetAs;
+  int32 m_iPriority;
 };
 
-class hkAabbHalf
-{
+class hkAabbHalf {
 public:
-	uint16 m_data;
-	uint16 m_extras;
+  uint16 m_data;
+  uint16 m_extras;
 };
 
-class hkAabbUint32
-{
+class hkAabbUint32 {
 public:
-	uint32 m_min;
-	uint8 m_expansionMin;
-	uint8 m_expansionShift;
-	uint32 m_max;
-	uint8 m_expansionMax;
-	uint8 m_shapeKeyByte;
+  uint32 m_min;
+  uint8 m_expansionMin;
+  uint8 m_expansionShift;
+  uint32 m_max;
+  uint8 m_expansionMax;
+  uint8 m_shapeKeyByte;
 };
 
-class hkArrayTypeAttribute
-{
+class hkArrayTypeAttribute {
 public:
-	int8 m_type;
+  int8 m_type;
 };
 
-class hkBitField
-{
+class hkBitField {
 public:
-	hkArray<uint32> m_words;
-	int32 m_numBits;
+  hkArray<uint32> m_words;
+  int32 m_numBits;
 };
 
-class hkCustomAttributesAttribute
-{
+class hkCustomAttributesAttribute {
 public:
-	char *m_name;
-	hkVariant m_value;
+  char *m_name;
+  hkVariant m_value;
 };
 
-class hkCustomAttributes
-{
+class hkCustomAttributes {
 public:
-	hkCustomAttributesAttribute *m_attributes;
+  hkCustomAttributesAttribute *m_attributes;
 };
 
-class hkClassEnumItem
-{
+class hkClassEnumItem {
 public:
-	int32 m_value;
-	char *m_name;
+  int32 m_value;
+  char *m_name;
 };
 
-class hkClassEnum
-{
+class hkClassEnum {
 public:
-	char *m_name;
-	hkClassEnumItem *m_items;
-	hkCustomAttributes *m_attributes;
-	hkFlags m_flags;
+  char *m_name;
+  hkClassEnumItem *m_items;
+  hkCustomAttributes *m_attributes;
+  hkFlags m_flags;
 };
 
-class hkClassMember
-{
+class hkClassMember {
 public:
-	char *m_name;
-	hkClass *m_class;
-	hkClassEnum *m_enum;
-	uint8 m_type;
-	uint8 m_subtype;
-	int16 m_cArraySize;
-	hkFlags m_flags;
-	uint16 m_offset;
-	hkCustomAttributes *m_attributes;
+  char *m_name;
+  hkClass *m_class;
+  hkClassEnum *m_enum;
+  uint8 m_type;
+  uint8 m_subtype;
+  int16 m_cArraySize;
+  hkFlags m_flags;
+  uint16 m_offset;
+  hkCustomAttributes *m_attributes;
 };
 
-class hkClass
-{
+class hkClass {
 public:
-	char *m_name;
-	hkClass *m_parent;
-	int32 m_objectSize;
-	int32 m_numImplementedInterfaces;
-	hkClassEnum *m_declaredEnums;
-	hkClassMember *m_declaredMembers;
-	void *m_defaults;
-	hkCustomAttributes *m_attributes;
-	hkFlags m_flags;
-	int32 m_describedVersion;
+  char *m_name;
+  hkClass *m_parent;
+  int32 m_objectSize;
+  int32 m_numImplementedInterfaces;
+  hkClassEnum *m_declaredEnums;
+  hkClassMember *m_declaredMembers;
+  void *m_defaults;
+  hkCustomAttributes *m_attributes;
+  hkFlags m_flags;
+  int32 m_describedVersion;
 };
 
-class hkColor
-{
+class hkColor {
 public:
 };
 
-class hkContactPointMaterial
-{
+class hkContactPointMaterial {
 public:
-	uint64 m_userData;
-	uint8 m_friction;
-	uint8 m_restitution;
-	uint8 m_maxImpulse;
-	uint8 m_flags;
+  uint64 m_userData;
+  uint8 m_friction;
+  uint8 m_restitution;
+  uint8 m_maxImpulse;
+  uint8 m_flags;
 };
 
-class hkDataObjectTypeAttribute
-{
+class hkDataObjectTypeAttribute {
 public:
-	char *m_typeName;
+  char *m_typeName;
 };
 
-class hkDescriptionAttribute
-{
+class hkDescriptionAttribute {
 public:
-	char *m_string;
+  char *m_string;
 };
 
-class hkDocumentationAttribute
-{
+class hkDocumentationAttribute {
 public:
-	char *m_docsSectionTag;
+  char *m_docsSectionTag;
 };
 
-class hkGeometryTriangle
-{
+class hkGeometryTriangle {
 public:
-	int32 m_a;
-	int32 m_b;
-	int32 m_c;
-	int32 m_material;
+  int32 m_a;
+  int32 m_b;
+  int32 m_c;
+  int32 m_material;
 };
 
-class hkGeometry
-{
+class hkGeometry {
 public:
-	hkArray<hkVector4> m_vertices;
-	hkArray<hkGeometryTriangle> m_triangles;
+  hkArray<hkVector4> m_vertices;
+  hkArray<hkGeometryTriangle> m_triangles;
 };
 
-class hkGizmoAttribute
-{
+class hkGizmoAttribute {
 public:
-	bool m_visible;
-	char *m_label;
-	int8 m_type;
+  bool m_visible;
+  char *m_label;
+  int8 m_type;
 };
 
-class hkHalf8
-{
+class hkHalf8 {
 public:
-	hkHalf m_quad;
+  hkHalf m_quad;
 };
 
-class hkLinkAttribute
-{
+class hkLinkAttribute {
 public:
-	int8 m_type;
+  int8 m_type;
 };
 
-class hkMemoryTrackerAttribute
-{
+class hkMemoryTrackerAttribute {
 public:
 };
 
-class hkModelerNodeTypeAttribute
-{
+class hkModelerNodeTypeAttribute {
 public:
-	int8 m_type;
+  int8 m_type;
 };
 
-class hkPackedVector3
-{
+class hkPackedVector3 {
 public:
-	int16 m_values;
+  int16 m_values;
 };
 
-class hkPostFinishAttribute
-{
+class hkPostFinishAttribute {
 public:
-	void *m_postFinishFunction;
+  void *m_postFinishFunction;
 };
 
-class hkQTransform
-{
+class hkQTransform {
 public:
-	hkQuaternion m_rotation;
-	hkVector4 m_translation;
+  hkQuaternion m_rotation;
+  hkVector4 m_translation;
 };
 
-class hkRangeInt32Attribute
-{
+class hkRangeInt32Attribute {
 public:
-	int32 m_absmin;
-	int32 m_absmax;
-	int32 m_softmin;
-	int32 m_softmax;
+  int32 m_absmin;
+  int32 m_absmax;
+  int32 m_softmin;
+  int32 m_softmax;
 };
 
-class hkRangeRealAttribute
-{
+class hkRangeRealAttribute {
 public:
-	float m_absmin;
-	float m_absmax;
-	float m_softmin;
-	float m_softmax;
+  float m_absmin;
+  float m_absmax;
+  float m_softmin;
+  float m_softmax;
 };
 
-class hkReflectedFileAttribute
-{
+class hkReflectedFileAttribute {
 public:
-	char *m_value;
+  char *m_value;
 };
 
-class hkSemanticsAttribute
-{
+class hkSemanticsAttribute {
 public:
-	int8 m_type;
+  int8 m_type;
 };
 
-class hkSphere
-{
+class hkSphere {
 public:
-	hkVector4 m_pos;
+  hkVector4 m_pos;
 };
 
-class hkTraceStreamTitle
-{
+class hkTraceStreamTitle {
 public:
-	char m_value;
+  char m_value;
 };
 
-class hkUiAttribute
-{
+class hkUiAttribute {
 public:
-	bool m_visible;
-	int8 m_hideInModeler;
-	char *m_label;
-	char *m_group;
-	char *m_hideBaseClassMembers;
-	bool m_endGroup;
-	bool m_endGroup2;
-	bool m_advanced;
+  bool m_visible;
+  int8 m_hideInModeler;
+  char *m_label;
+  char *m_group;
+  char *m_hideBaseClassMembers;
+  bool m_endGroup;
+  bool m_endGroup2;
+  bool m_advanced;
 };
 
-class hkMonitorStreamFrameInfo
-{
+class hkMonitorStreamFrameInfo {
 public:
-	hkStringPtr m_heading;
-	int32 m_indexOfTimer0;
-	int32 m_indexOfTimer1;
-	uint32 m_absoluteTimeCounter;
-	float m_timerFactor0;
-	float m_timerFactor1;
-	int32 m_threadId;
-	int32 m_frameStreamStart;
-	int32 m_frameStreamEnd;
+  hkStringPtr m_heading;
+  int32 m_indexOfTimer0;
+  int32 m_indexOfTimer1;
+  uint32 m_absoluteTimeCounter;
+  float m_timerFactor0;
+  float m_timerFactor1;
+  int32 m_threadId;
+  int32 m_frameStreamStart;
+  int32 m_frameStreamEnd;
 };
 
-class hkMonitorStreamStringMapStringMap
-{
+class hkMonitorStreamStringMapStringMap {
 public:
-	uint64 m_id;
-	hkStringPtr m_string;
+  uint64 m_id;
+  hkStringPtr m_string;
 };
 
-class hkMonitorStreamStringMap
-{
+class hkMonitorStreamStringMap {
 public:
-	hkArray<hkMonitorStreamStringMapStringMap> m_map;
+  hkArray<hkMonitorStreamStringMapStringMap> m_map;
 };
 
-class hkPackfileHeader
-{
+class hkPackfileHeader {
 public:
-	int32 m_magic;
-	int32 m_userTag;
-	int32 m_fileVersion;
-	uint8 m_layoutRules;
-	int32 m_numSections;
-	int32 m_contentsSectionIndex;
-	int32 m_contentsSectionOffset;
-	int32 m_contentsClassNameSectionIndex;
-	int32 m_contentsClassNameSectionOffset;
-	char m_contentsVersion;
-	int32 m_flags;
-	int32 m_pad;
+  int32 m_magic;
+  int32 m_userTag;
+  int32 m_fileVersion;
+  uint8 m_layoutRules;
+  int32 m_numSections;
+  int32 m_contentsSectionIndex;
+  int32 m_contentsSectionOffset;
+  int32 m_contentsClassNameSectionIndex;
+  int32 m_contentsClassNameSectionOffset;
+  char m_contentsVersion;
+  int32 m_flags;
+  int32 m_pad;
 };
 
-class hkPackfileSectionHeader
-{
+class hkPackfileSectionHeader {
 public:
-	char m_sectionTag;
-	char m_nullByte;
-	int32 m_absoluteDataStart;
-	int32 m_localFixupsOffset;
-	int32 m_globalFixupsOffset;
-	int32 m_virtualFixupsOffset;
-	int32 m_exportsOffset;
-	int32 m_importsOffset;
-	int32 m_endOffset;
+  char m_sectionTag;
+  char m_nullByte;
+  int32 m_absoluteDataStart;
+  int32 m_localFixupsOffset;
+  int32 m_globalFixupsOffset;
+  int32 m_virtualFixupsOffset;
+  int32 m_exportsOffset;
+  int32 m_importsOffset;
+  int32 m_endOffset;
 };
 
-class hkRootLevelContainerNamedVariant
-{
+class hkRootLevelContainerNamedVariant {
 public:
-	hkStringPtr m_name;
-	hkStringPtr m_className;
-	hkReferencedObject *m_variant;
+  hkStringPtr m_name;
+  hkStringPtr m_className;
+  hkReferencedObject *m_variant;
 };
 
-class hkRootLevelContainer
-{
+class hkRootLevelContainer {
 public:
-	hkArray<hkRootLevelContainerNamedVariant> m_namedVariants;
+  hkArray<hkRootLevelContainerNamedVariant> m_namedVariants;
 };
 
-class hkMeshSection
-{
+class hkMeshSection {
 public:
-	uint8 m_primitiveType;
-	int32 m_numPrimitives;
-	int32 m_numIndices;
-	int32 m_vertexStartIndex;
-	int32 m_transformIndex;
-	uint8 m_indexType;
-	void *m_indices;
-	hkMeshVertexBuffer *m_vertexBuffer;
-	hkMeshMaterial *m_material;
-	int32 m_sectionIndex;
+  uint8 m_primitiveType;
+  int32 m_numPrimitives;
+  int32 m_numIndices;
+  int32 m_vertexStartIndex;
+  int32 m_transformIndex;
+  uint8 m_indexType;
+  void *m_indices;
+  hkMeshVertexBuffer *m_vertexBuffer;
+  hkMeshMaterial *m_material;
+  int32 m_sectionIndex;
 };
 
-class hkpMassProperties
-{
+class hkpMassProperties {
 public:
-	float m_volume;
-	float m_mass;
-	hkVector4 m_centerOfMass;
-	hkMatrix3 m_inertiaTensor;
+  float m_volume;
+  float m_mass;
+  hkVector4 m_centerOfMass;
+  hkMatrix3 m_inertiaTensor;
 };
 
-class hkpWeldingUtility
-{
+class hkpWeldingUtility {
 public:
 };
 
-class hkpCenterOfMassChangerModifierConstraintAtom : public hkpModifierConstraintAtom
-{
+class hkpCenterOfMassChangerModifierConstraintAtom
+    : public hkpModifierConstraintAtom {
 public:
-	hkVector4 m_displacementA;
-	hkVector4 m_displacementB;
+  hkVector4 m_displacementA;
+  hkVector4 m_displacementB;
 };
 
-class hkpIgnoreModifierConstraintAtom : public hkpModifierConstraintAtom
-{
+class hkpIgnoreModifierConstraintAtom : public hkpModifierConstraintAtom {
 public:
 };
 
-class hkpMassChangerModifierConstraintAtom : public hkpModifierConstraintAtom
-{
+class hkpMassChangerModifierConstraintAtom : public hkpModifierConstraintAtom {
 public:
-	hkVector4 m_factorA;
-	hkVector4 m_factorB;
+  hkVector4 m_factorA;
+  hkVector4 m_factorB;
 };
 
-class hkpMovingSurfaceModifierConstraintAtom : public hkpModifierConstraintAtom
-{
+class hkpMovingSurfaceModifierConstraintAtom
+    : public hkpModifierConstraintAtom {
 public:
-	hkVector4 m_velocity;
+  hkVector4 m_velocity;
 };
 
-class hkpOverwritePivotConstraintAtom : public hkpConstraintAtom
-{
+class hkpOverwritePivotConstraintAtom : public hkpConstraintAtom {
 public:
-	uint8 m_copyToPivotBFromPivotA;
+  uint8 m_copyToPivotBFromPivotA;
 };
 
-class hkpSoftContactModifierConstraintAtom : public hkpModifierConstraintAtom
-{
+class hkpSoftContactModifierConstraintAtom : public hkpModifierConstraintAtom {
 public:
-	float m_tau;
-	float m_maxAcceleration;
+  float m_tau;
+  float m_maxAcceleration;
 };
 
-class hkpViscousSurfaceModifierConstraintAtom : public hkpModifierConstraintAtom
-{
+class hkpViscousSurfaceModifierConstraintAtom
+    : public hkpModifierConstraintAtom {
 public:
 };
 
-class hkpMoppCodeReindexedTerminal
-{
+class hkpMoppCodeReindexedTerminal {
 public:
-	uint32 m_origShapeKey;
-	uint32 m_reindexedShapeKey;
+  uint32 m_origShapeKey;
+  uint32 m_reindexedShapeKey;
 };
 
-class hkaQuantizedAnimationTrackCompressionParams
-{
+class hkaQuantizedAnimationTrackCompressionParams {
 public:
-	float m_rotationTolerance;
-	float m_translationTolerance;
-	float m_scaleTolerance;
-	float m_floatingTolerance;
+  float m_rotationTolerance;
+  float m_translationTolerance;
+  float m_scaleTolerance;
+  float m_floatingTolerance;
 };
 
-class hkaSplineCompressedAnimationAnimationCompressionParams
-{
+class hkaSplineCompressedAnimationAnimationCompressionParams {
 public:
-	uint16 m_maxFramesPerBlock;
-	bool m_enableSampleSingleTracks;
+  uint16 m_maxFramesPerBlock;
+  bool m_enableSampleSingleTracks;
 };
 
-class hkaSplineCompressedAnimationTrackCompressionParams
-{
+class hkaSplineCompressedAnimationTrackCompressionParams {
 public:
-	float m_rotationTolerance;
-	float m_translationTolerance;
-	float m_scaleTolerance;
-	float m_floatingTolerance;
-	uint16 m_rotationDegree;
-	uint16 m_translationDegree;
-	uint16 m_scaleDegree;
-	uint16 m_floatingDegree;
-	uint8 m_rotationQuantizationType;
-	uint8 m_translationQuantizationType;
-	uint8 m_scaleQuantizationType;
-	uint8 m_floatQuantizationType;
+  float m_rotationTolerance;
+  float m_translationTolerance;
+  float m_scaleTolerance;
+  float m_floatingTolerance;
+  uint16 m_rotationDegree;
+  uint16 m_translationDegree;
+  uint16 m_scaleDegree;
+  uint16 m_floatingDegree;
+  uint8 m_rotationQuantizationType;
+  uint8 m_translationQuantizationType;
+  uint8 m_scaleQuantizationType;
+  uint8 m_floatQuantizationType;
 };
 
-class hkaWaveletCompressedAnimationCompressionParams
-{
+class hkaWaveletCompressedAnimationCompressionParams {
 public:
-	uint16 m_quantizationBits;
-	uint16 m_blockSize;
-	uint16 m_preserve;
-	float m_truncProp;
-	bool m_useOldStyleTruncation;
-	float m_absolutePositionTolerance;
-	float m_relativePositionTolerance;
-	float m_rotationTolerance;
-	float m_scaleTolerance;
-	float m_absoluteFloatTolerance;
+  uint16 m_quantizationBits;
+  uint16 m_blockSize;
+  uint16 m_preserve;
+  float m_truncProp;
+  bool m_useOldStyleTruncation;
+  float m_absolutePositionTolerance;
+  float m_relativePositionTolerance;
+  float m_rotationTolerance;
+  float m_scaleTolerance;
+  float m_absoluteFloatTolerance;
 };
 
-class hkaKeyFrameHierarchyUtility
-{
+class hkaKeyFrameHierarchyUtility {
 public:
 };
 
-class hkbBlendCurveUtils
-{
+class hkbBlendCurveUtils {
 public:
 };
 
-class hkbContext
-{
+class hkbContext {
 public:
-	void *m_character;
-	void *m_behavior;
-	void *m_nodeToIndexMap;
-	void *m_eventQueue;
-	void *m_sharedEventQueue;
-	hkbGeneratorOutputListener *m_generatorOutputListener;
-	bool m_eventTriggeredTransition;
-	void *m_world;
-	void *m_attachmentManager;
-	void *m_animationCache;
+  void *m_character;
+  void *m_behavior;
+  void *m_nodeToIndexMap;
+  void *m_eventQueue;
+  void *m_sharedEventQueue;
+  hkbGeneratorOutputListener *m_generatorOutputListener;
+  bool m_eventTriggeredTransition;
+  void *m_world;
+  void *m_attachmentManager;
+  void *m_animationCache;
 };
 
-class hkbDefaultMessageLog
-{
+class hkbDefaultMessageLog {
 public:
 };
 
-class hkbMessageLog
-{
+class hkbMessageLog {
 public:
-	void *m_messages;
-	int32 m_maxMessages;
+  void *m_messages;
+  int32 m_maxMessages;
 };
 
-class hkbStateMachineNestedStateMachineData
-{
+class hkbStateMachineNestedStateMachineData {
 public:
-	void *m_nestedStateMachine;
-	void *m_eventIdMap;
+  void *m_nestedStateMachine;
+  void *m_eventIdMap;
 };
 
-class hkbWorldEnums
-{
+class hkbWorldEnums {
 public:
 };
 
-class hkVariableTweakingHelperBoolVariableInfo
-{
+class hkVariableTweakingHelperBoolVariableInfo {
 public:
-	hkStringPtr m_name;
-	bool m_value;
-	bool m_tweakOn;
+  hkStringPtr m_name;
+  bool m_value;
+  bool m_tweakOn;
 };
 
-class hkVariableTweakingHelperVector4VariableInfo
-{
+class hkVariableTweakingHelperVector4VariableInfo {
 public:
-	hkStringPtr m_name;
-	float m_x;
-	float m_y;
-	float m_z;
-	float m_w;
-	bool m_tweakOn;
+  hkStringPtr m_name;
+  float m_x;
+  float m_y;
+  float m_z;
+  float m_w;
+  bool m_tweakOn;
 };
 
-class hkVariableTweakingHelperRealVariableInfo
-{
+class hkVariableTweakingHelperRealVariableInfo {
 public:
-	hkStringPtr m_name;
-	float m_value;
-	bool m_tweakOn;
+  hkStringPtr m_name;
+  float m_value;
+  bool m_tweakOn;
 };
 
-class hkVariableTweakingHelperIntVariableInfo
-{
+class hkVariableTweakingHelperIntVariableInfo {
 public:
-	hkStringPtr m_name;
-	int32 m_value;
-	bool m_tweakOn;
+  hkStringPtr m_name;
+  int32 m_value;
+  bool m_tweakOn;
 };
 
-class hkVariableTweakingHelper
-{
+class hkVariableTweakingHelper {
 public:
-	hkArray<hkVariableTweakingHelperBoolVariableInfo> m_boolVariableInfo;
-	hkArray<hkVariableTweakingHelperIntVariableInfo> m_intVariableInfo;
-	hkArray<hkVariableTweakingHelperRealVariableInfo> m_realVariableInfo;
-	hkArray<hkVariableTweakingHelperVector4VariableInfo> m_vector4VariableInfo;
-	void *m_behavior;
-	hkArray<void> m_boolIndices;
-	hkArray<void> m_intIndices;
-	hkArray<void> m_realIndices;
-	hkArray<void> m_vector4Indices;
+  hkArray<hkVariableTweakingHelperBoolVariableInfo> m_boolVariableInfo;
+  hkArray<hkVariableTweakingHelperIntVariableInfo> m_intVariableInfo;
+  hkArray<hkVariableTweakingHelperRealVariableInfo> m_realVariableInfo;
+  hkArray<hkVariableTweakingHelperVector4VariableInfo> m_vector4VariableInfo;
+  void *m_behavior;
+  hkArray<void> m_boolIndices;
+  hkArray<void> m_intIndices;
+  hkArray<void> m_realIndices;
+  hkArray<void> m_vector4Indices;
 };
 
-class hkpCollidableCollidableFilter
-{
+class hkpCollidableCollidableFilter {
 public:
 };
 
-class hkpPhantomCallbackShape : public hkpShape
-{
+class hkpPhantomCallbackShape : public hkpShape {
 public:
 };
 
-class hkpRayCollidableFilter
-{
+class hkpRayCollidableFilter {
 public:
 };
 
-class hkpRayShapeCollectionFilter
-{
+class hkpRayShapeCollectionFilter {
 public:
 };
 
-class hkpShapeCollectionFilter
-{
+class hkpShapeCollectionFilter {
 public:
 };
 
-class hkpShapeModifier : public hkReferencedObject
-{
+class hkpShapeModifier : public hkReferencedObject {
 public:
 };
 
-class hkpArrayAction : public hkpAction
-{
+class hkpArrayAction : public hkpAction {
 public:
-	hkArray<hkpEntity *> m_entities;
+  hkArray<hkpEntity *> m_entities;
 };
 
-class hkpBreakableBody : public hkReferencedObject
-{
+class hkpBreakableBody : public hkReferencedObject {
 public:
 };
 
-using CreatorFunction = std::function<void*(void*)>;
+using CreatorFunction = std::function<void *(void *)>;
 
-struct typeinfo
-{
-	uint32 vtable;
-	CreatorFunction creator;
+struct typeinfo {
+  uint32 vtable;
+  uint32 size;
+  CreatorFunction creator;
 };
 
-std::map<std::string, typeinfo> typeinfos = {
-	{
-		"hkBaseObject",
-		{
-			4294967295,
-			[](void *mem) -> void* { return new (mem) hkBaseObject(); }
-		}
-	},
-	{
-		"hkReferencedObject", 
-		{
-			4294967295,
-			[](void *mem) -> void* { return new (mem) hkReferencedObject(); }
-		}
-	},
-	{
-		"hkLocalFrameGroup", 
-		{
-			4294967295,
-			[](void *mem) -> void* { return new (mem) hkLocalFrameGroup(); }
-		}
-	},
-	{"hkLocalFrame", {0}},
-	{"hkSimpleLocalFrame", {4294967295}},
-	{"hkTrackerSerializableScanSnapshotAllocation", {0}},
-	{"hkTrackerSerializableScanSnapshotBlock", {0}},
-	{"hkTrackerSerializableScanSnapshot", {4294967295}},
-	{"hkMonitorStreamColorTableColorPair", {0}},
-	{"hkMonitorStreamColorTable", {4294967295}},
-	{"hkResourceBase", {0}},
-	{"hkResourceContainer", {0}},
-	{"hkMemoryResourceHandleExternalLink", {0}},
-	{"hkResourceHandle", {0}},
-	{"hkMemoryResourceHandle", {4294967295}},
-	{"hkMemoryResourceContainer", {4294967295}},
-	{"hkAlignSceneToNodeOptions", {4294967295}},
-	{"hkxAnimatedFloat", {4294967295}},
-	{"hkxAnimatedMatrix", {4294967295}},
-	{"hkxAnimatedQuaternion", {4294967295}},
-	{"hkxAnimatedVector", {4294967295}},
-	{"hkxAttribute", {0}},
-	{"hkxAttributeGroup", {0}},
-	{"hkxAttributeHolder", {4294967295}},
-	{"hkxCamera", {4294967295}},
-	{"hkxEdgeSelectionChannel", {4294967295}},
-	{"hkxEnumItem", {0}},
-	{"hkxEnum", {4294967295}},
-	{"hkxEnvironmentVariable", {0}},
-	{"hkxEnvironment", {4294967295}},
-	{"hkxIndexBuffer", {4294967295}},
-	{"hkxLight", {4294967295}},
-	{"hkxMaterialTextureStage", {0}},
-	{"hkxMaterialProperty", {0}},
-	{"hkxMaterial", {4294967295}},
-	{"hkxMaterialEffect", {4294967295}},
-	{"hkxMaterialShader", {4294967295}},
-	{"hkxMaterialShaderSet", {4294967295}},
-	{"hkxMeshUserChannelInfo", {4294967295}},
-	{"hkxVertexDescriptionElementDecl", {0}},
-	{"hkxVertexDescription", {0}},
-	{"hkxVertexBufferVertexData", {0}},
-	{"hkxVertexBuffer", {4294967295}},
-	{"hkxMeshSection", {4294967295}},
-	{"hkxMesh", {4294967295}},
-	{"hkxNodeAnnotationData", {0}},
-	{"hkxNode", {4294967295}},
-	{"hkxNodeSelectionSet", {4294967295}},
-	{"hkxSkinBinding", {4294967295}},
-	{"hkxTextureFile", {4294967295}},
-	{"hkxTextureInplace", {4294967295}},
-	{"hkxScene", {4294967295}},
-	{"hkxSparselyAnimatedBool", {4294967295}},
-	{"hkxSparselyAnimatedInt", {4294967295}},
-	{"hkxSparselyAnimatedEnum", {4294967295}},
-	{"hkxSparselyAnimatedString", {4294967295}},
-	{"hkxTriangleSelectionChannel", {4294967295}},
-	{"hkxVertexFloatDataChannel", {4294967295}},
-	{"hkxVertexIntDataChannel", {4294967295}},
-	{"hkxVertexSelectionChannel", {4294967295}},
-	{"hkxVertexVectorDataChannel", {4294967295}},
-	{"hkMeshBoneIndexMapping", {0}},
-	{"hkIndexedTransformSet", {4294967295}},
-	{"hkMeshVertexBuffer", {0}},
-	{"hkMeshShape", {0}},
-	{"hkMeshBody", {0}},
-	{"hkMemoryMeshBody", {4294967295}},
-	{"hkMeshTexture", {0}},
-	{"hkMeshMaterial", {0}},
-	{"hkMemoryMeshMaterial", {4294967295}},
-	{"hkMeshSectionCinfo", {0}},
-	{"hkMemoryMeshShape", {4294967295}},
-	{"hkMemoryMeshTexture", {4294967295}},
-	{"hkVertexFormatElement", {0}},
-	{"hkVertexFormat", {0}},
-	{"hkMemoryMeshVertexBuffer", {4294967295}},
-	{"hkMultipleVertexBufferElementInfo", {0}},
-	{"hkMultipleVertexBufferVertexBufferInfo", {0}},
-	{"hkMultipleVertexBufferLockedElement", {0}},
-	{"hkMultipleVertexBuffer", {4294967295}},
-	{"hkpShape", {0}},
-	{"hkpSphereRepShape", {0}},
-	{"hkpConvexShape", {0}},
-	{"hkpBoxShape", {4294967295}},
-	{"hkpShapeContainer", {0}},
-	{"hkpSingleShapeContainer", {4294967295}},
-	{"hkpBvShape", {4294967295}},
-	{"hkpCapsuleShape", {4294967295}},
-	{"hkpCollisionFilter", {0}},
-	{"hkpCollisionFilterList", {4294967295}},
-	{"hkpConvexListShape", {4294967295}},
-	{"hkpConvexTransformShapeBase", {0}},
-	{"hkpConvexTransformShape", {4294967295}},
-	{"hkpConvexTranslateShape", {4294967295}},
-	{"hkpConvexVerticesConnectivity", {4294967295}},
-	{"hkpCylinderShape", {4294967295}},
-	{"hkpConvexListFilter", {0}},
-	{"hkpDefaultConvexListFilter", {4294967295}},
-	{"hkpGroupFilter", {4294967295}},
-	{"hkpListShapeChildInfo", {0}},
-	{"hkpShapeCollection", {0}},
-	{"hkpListShape", {4294967295}},
-	{"hkpMoppCodeCodeInfo", {0}},
-	{"hkpMoppCode", {4294967295}},
-	{"hkpBvTreeShape", {0}},
-	{"hkMoppBvTreeShapeBase", {0}},
-	{"hkpMoppBvTreeShape", {4294967295}},
-	{"hkpMultiRayShapeRay", {0}},
-	{"hkpMultiRayShape", {4294967295}},
-	{"hkpMultiSphereShape", {4294967295}},
-	{"hkpNullCollisionFilter", {4294967295}},
-	{"hkpRemoveTerminalsMoppModifier", {4294967295}},
-	{"hkpShapeInfo", {4294967295}},
-	{"hkpSphereShape", {4294967295}},
-	{"hkpTransformShape", {4294967295}},
-	{"hkpTriangleShape", {4294967295}},
-	{"hkAabb", {0}},
-	{"hkpCompressedMeshShapeChunk", {0}},
-	{"hkpCompressedMeshShapeConvexPiece", {0}},
-	{"hkpMeshMaterial", {0}},
-	{"hkpNamedMeshMaterial", {0}},
-	{"hkpCompressedMeshShapeBigTriangle", {0}},
-	{"hkpCompressedMeshShape", {4294967295}},
-	{"hkpConvexVerticesShapeFourVectors", {0}},
-	{"hkpConvexVerticesShape", {4294967295}},
-	{"hkpConvexPieceStreamData", {4294967295}},
-	{"hkpConvexPieceMeshShape", {4294967295}},
-	{"hkpExtendedMeshShapeSubpart", {0}},
-	{"hkpExtendedMeshShapeShapesSubpart", {0}},
-	{"hkpExtendedMeshShapeTrianglesSubpart", {0}},
-	{"hkpExtendedMeshShape", {4294967295}},
-	{"hkpStorageExtendedMeshShapeMaterial", {0}},
-	{"hkpStorageExtendedMeshShapeShapeSubpartStorage", {4294967295}},
-	{"hkpStorageExtendedMeshShapeMeshSubpartStorage", {4294967295}},
-	{"hkpStorageExtendedMeshShape", {4294967295}},
-	{"hkpHeightFieldShape", {0}},
-	{"hkpSampledHeightFieldShape", {0}},
-	{"hkpCompressedSampledHeightFieldShape", {4294967295}},
-	{"hkpPlaneShape", {4294967295}},
-	{"hkpStorageSampledHeightFieldShape", {4294967295}},
-	{"hkpTriSampledHeightFieldBvTreeShape", {4294967295}},
-	{"hkpTriSampledHeightFieldCollection", {4294967295}},
-	{"hkpMeshShapeSubpart", {0}},
-	{"hkpMeshShape", {4294967295}},
-	{"hkpFastMeshShape", {4294967295}},
-	{"hkpStorageMeshShapeSubpartStorage", {4294967295}},
-	{"hkpStorageMeshShape", {4294967295}},
-	{"hkpSimpleMeshShapeTriangle", {0}},
-	{"hkpSimpleMeshShape", {4294967295}},
-	{"hkMultiThreadCheck", {0}},
-	{"hkpCollidableBoundingVolumeData", {0}},
-	{"hkpCdBody", {0}},
-	{"hkpBroadPhaseHandle", {0}},
-	{"hkpTypedBroadPhaseHandle", {0}},
-	{"hkpCollidable", {0}},
-	{"hkpLinkedCollidable", {0}},
-	{"hkpPropertyValue", {0}},
-	{"hkpProperty", {0}},
-	{"hkpWorldObject", {0}},
-	{"hkpPhantom", {0}},
-	{"hkpAabbPhantom", {4294967295}},
-	{"hkpConstraintData", {0}},
-	{"hkpConstraintAtom", {0}},
-	{"hkpSetupStabilizationAtom", {0}},
-	{"hkpBallSocketConstraintAtom", {0}},
-	{"hkpSetLocalTranslationsConstraintAtom", {0}},
-	{"hkpBallAndSocketConstraintDataAtoms", {0}},
-	{"hkpBallAndSocketConstraintData", {4294967295}},
-	{"hkpBridgeConstraintAtom", {0}},
-	{"hkpBridgeAtoms", {0}},
-	{"hkpConstraintChainData", {0}},
-	{"hkpBallSocketChainDataConstraintInfo", {0}},
-	{"hkpBallSocketChainData", {4294967295}},
-	{"hkSweptTransform", {0}},
-	{"hkMotionState", {0}},
-	{"hkpKeyframedRigidMotion", {4294967295}},
-	{"hkpMaxSizeMotion", {4294967295}},
-	{"hkpMotion", {0}},
-	{"hkpBoxMotion", {4294967295}},
-	{"hkpBreakableConstraintData", {4294967295}},
-	{"hkpShapePhantom", {0}},
-	{"hkpCachingShapePhantom", {4294967295}},
-	{"hkpConstraintMotor", {0}},
-	{"hkpLimitedForceConstraintMotor", {0}},
-	{"hkpCallbackConstraintMotor", {4294967295}},
-	{"hkpCharacterMotion", {4294967295}},
-	{"hkpSetLocalTransformsConstraintAtom", {0}},
-	{"hkpCogWheelConstraintAtom", {0}},
-	{"hkpCogWheelConstraintDataAtoms", {0}},
-	{"hkpCogWheelConstraintData", {4294967295}},
-	{"hkpAction", {0}},
-	{"hkpConstraintChainInstanceAction", {4294967295}},
-	{"hkpEntitySmallArraySerializeOverrideType", {0}},
-	{"hkpEntityExtendedListeners", {0}},
-	{"hkpMaterial", {0}},
-	{"hkpModifierConstraintAtom", {0}},
-	{"hkpConstraintInstanceSmallArraySerializeOverrideType", {0}},
-	{"hkpConstraintInstance", {4294967295}},
-	{"hkpEntitySpuCollisionCallback", {0}},
-	{"hkpEntity", {4294967295}},
-	{"hkpConstraintChainInstance", {4294967295}},
-	{"hkpPairCollisionFilterMapPairFilterKeyOverrideType", {0}},
-	{"hkpPairCollisionFilter", {4294967295}},
-	{"hkpConstraintCollisionFilter", {4294967295}},
-	{"hkWorldMemoryAvailableWatchDog", {0}},
-	{"hkpDefaultWorldMemoryWatchDog", {4294967295}},
-	{"hkpFixedRigidMotion", {4294967295}},
-	{"hkpGenericConstraintDataSchemeConstraintInfo", {0}},
-	{"hkpGenericConstraintDataScheme", {0}},
-	{"hkpGenericConstraintData", {4294967295}},
-	{"hkp2dAngConstraintAtom", {0}},
-	{"hkpHingeConstraintDataAtoms", {0}},
-	{"hkpHingeConstraintData", {4294967295}},
-	{"hkpAngLimitConstraintAtom", {0}},
-	{"hkpSetLocalRotationsConstraintAtom", {0}},
-	{"hkpHingeLimitsDataAtoms", {0}},
-	{"hkpHingeLimitsData", {4294967295}},
-	{"hkpAngMotorConstraintAtom", {0}},
-	{"hkpAngFrictionConstraintAtom", {0}},
-	{"hkpLimitedHingeConstraintDataAtoms", {0}},
-	{"hkpLimitedHingeConstraintData", {4294967295}},
-	{"hkpParametricCurve", {0}},
-	{"hkpLinearParametricCurve", {4294967295}},
-	{"hkpMalleableConstraintData", {4294967295}},
-	{"hkpRigidBody", {4294967295}},
-	{"hkpPhysicsSystem", {4294967295}},
-	{"hkpPointToPathConstraintData", {4294967295}},
-	{"hkpLinConstraintAtom", {0}},
-	{"hkpPointToPlaneConstraintDataAtoms", {0}},
-	{"hkpPointToPlaneConstraintData", {4294967295}},
-	{"hkpPositionConstraintMotor", {4294967295}},
-	{"hkpLinLimitConstraintAtom", {0}},
-	{"hkpAngConstraintAtom", {0}},
-	{"hkpLinFrictionConstraintAtom", {0}},
-	{"hkpLinMotorConstraintAtom", {0}},
-	{"hkpPrismaticConstraintDataAtoms", {0}},
-	{"hkpPrismaticConstraintData", {4294967295}},
-	{"hkpPulleyConstraintAtom", {0}},
-	{"hkpPulleyConstraintDataAtoms", {0}},
-	{"hkpPulleyConstraintData", {4294967295}},
-	{"hkpRackAndPinionConstraintAtom", {0}},
-	{"hkpRackAndPinionConstraintDataAtoms", {0}},
-	{"hkpRackAndPinionConstraintData", {4294967295}},
-	{"hkpRagdollMotorConstraintAtom", {0}},
-	{"hkpTwistLimitConstraintAtom", {0}},
-	{"hkpConeLimitConstraintAtom", {0}},
-	{"hkpRagdollConstraintDataAtoms", {0}},
-	{"hkpRagdollConstraintData", {4294967295}},
-	{"hkpRagdollLimitsDataAtoms", {0}},
-	{"hkpRagdollLimitsData", {4294967295}},
-	{"hkpRotationalConstraintDataAtoms", {0}},
-	{"hkpRotationalConstraintData", {4294967295}},
-	{"hkpSimpleShapePhantomCollisionDetail", {0}},
-	{"hkpSimpleShapePhantom", {4294967295}},
-	{"hkpWorld", {4294967295}},
-	{"hkpSimulation", {4294967295}},
-	{"hkpSphereMotion", {4294967295}},
-	{"hkpSpringDamperConstraintMotor", {4294967295}},
-	{"hkpStiffSpringChainDataConstraintInfo", {0}},
-	{"hkpStiffSpringChainData", {4294967295}},
-	{"hkpStiffSpringConstraintAtom", {0}},
-	{"hkpStiffSpringConstraintDataAtoms", {0}},
-	{"hkpStiffSpringConstraintData", {4294967295}},
-	{"hkpThinBoxMotion", {4294967295}},
-	{"hkpVelocityConstraintMotor", {4294967295}},
-	{"hkpLinSoftConstraintAtom", {0}},
-	{"hkpWheelConstraintDataAtoms", {0}},
-	{"hkpWheelConstraintData", {4294967295}},
-	{"hkpWorldCinfo", {4294967295}},
-	{"hkpPoweredChainDataConstraintInfo", {0}},
-	{"hkpPoweredChainData", {4294967295}},
-	{"hkpBinaryAction", {0}},
-	{"hkpAngularDashpotAction", {4294967295}},
-	{"hkpFirstPersonGun", {4294967295}},
-	{"hkpBallGun", {4294967295}},
-	{"hkpCharacterControllerCinfo", {4294967295}},
-	{"hkpCharacterProxyCinfo", {4294967295}},
-	{"hkpCharacterRigidBodyCinfo", {4294967295}},
-	{"hkpConstrainedSystemFilter", {4294967295}},
-	{"hkpDashpotAction", {4294967295}},
-	{"hkpDisableEntityCollisionFilter", {4294967295}},
-	{"hkpDisplayBindingDataRigidBody", {4294967295}},
-	{"hkpDisplayBindingDataPhysicsSystem", {4294967295}},
-	{"hkpDisplayBindingData", {4294967295}},
-	{"hkpGravityGun", {4294967295}},
-	{"hkpGroupCollisionFilter", {4294967295}},
-	{"hkpUnaryAction", {0}},
-	{"hkpMotorAction", {4294967295}},
-	{"hkpMountedBallGun", {4294967295}},
-	{"hkpMouseSpringAction", {4294967295}},
-	{"hkpPhysicsData", {4294967295}},
-	{"hkContactPoint", {0}},
-	{"hkpSerializedSubTrack1nInfo", {0}},
-	{"hkpAgent1nSector", {0}},
-	{"hkpSerializedTrack1nInfo", {0}},
-	{"hkpSimpleContactConstraintDataInfo", {0}},
-	{"hkpSimpleContactConstraintAtom", {0}},
-	{"hkpSerializedAgentNnEntry", {4294967295}},
-	{"hkpPhysicsSystemWithContacts", {4294967295}},
-	{"hkpPoweredChainMapperLinkInfo", {0}},
-	{"hkpPoweredChainMapperTarget", {0}},
-	{"hkpPoweredChainMapper", {4294967295}},
-	{"hkpProjectileGun", {4294967295}},
-	{"hkpReorientAction", {4294967295}},
-	{"hkpSerializedDisplayMarker", {4294967295}},
-	{"hkpSerializedDisplayMarkerList", {4294967295}},
-	{"hkpSerializedDisplayRbTransformsDisplayTransformPair", {0}},
-	{"hkpSerializedDisplayRbTransforms", {4294967295}},
-	{"hkpSpringAction", {4294967295}},
-	{"hkpTriggerVolumeEventInfo", {0}},
-	{"hkpTriggerVolume", {4294967295}},
-	{"hkaAnimatedReferenceFrame", {0}},
-	{"hkaAnnotationTrackAnnotation", {0}},
-	{"hkaAnnotationTrack", {0}},
-	{"hkaAnimation", {0}},
-	{"hkaAnimationBinding", {4294967295}},
-	{"hkaSkeletonLocalFrameOnBone", {0}},
-	{"hkaBone", {0}},
-	{"hkaSkeleton", {4294967295}},
-	{"hkaMeshBindingMapping", {0}},
-	{"hkaMeshBinding", {4294967295}},
-	{"hkaBoneAttachment", {4294967295}},
-	{"hkaAnimationContainer", {4294967295}},
-	{"hkaAnimationPreviewColorContainer", {4294967295}},
-	{"hkaDefaultAnimatedReferenceFrame", {4294967295}},
-	{"hkaDeltaCompressedAnimationQuantizationFormat", {0}},
-	{"hkaDeltaCompressedAnimation", {4294967295}},
-	{"hkaFootstepAnalysisInfo", {4294967295}},
-	{"hkaFootstepAnalysisInfoContainer", {4294967295}},
-	{"hkaInterleavedUncompressedAnimation", {4294967295}},
-	{"hkaQuantizedAnimation", {4294967295}},
-	{"hkaSkeletonMapperDataChainMapping", {0}},
-	{"hkaSkeletonMapperDataSimpleMapping", {0}},
-	{"hkaSkeletonMapperData", {0}},
-	{"hkaSkeletonMapper", {4294967295}},
-	{"hkaSplineCompressedAnimation", {4294967295}},
-	{"hkaWaveletCompressedAnimationQuantizationFormat", {0}},
-	{"hkaWaveletCompressedAnimation", {4294967295}},
-	{"hkaRagdollInstance", {4294967295}},
-	{"hkbVariableBindingSetBinding", {0}},
-	{"hkbVariableBindingSet", {4294967295}},
-	{"hkbBindable", {4294967295}},
-	{"hkbNode", {4294967295}},
-	{"hkbModifier", {4294967295}},
-	{"hkbEventPayload", {4294967295}},
-	{"hkbEventBase", {0}},
-	{"hkbEventProperty", {0}},
-	{"hkbProjectStringData", {4294967295}},
-	{"hkbProjectData", {4294967295}},
-	{"hkbHandIkDriverInfoHand", {0}},
-	{"hkbHandIkDriverInfo", {4294967295}},
-	{"hkbRoleAttribute", {0}},
-	{"hkbVariableInfo", {0}},
-	{"hkbCharacterDataCharacterControllerInfo", {0}},
-	{"hkbFootIkDriverInfoLeg", {0}},
-	{"hkbFootIkDriverInfo", {4294967295}},
-	{"hkbMirroredSkeletonInfo", {4294967295}},
-	{"hkbCharacterStringData", {4294967295}},
-	{"hkbVariableValue", {0}},
-	{"hkbVariableValueSet", {4294967295}},
-	{"hkbCharacterData", {4294967295}},
-	{"hkbCharacterSetup", {4294967295}},
-	{"hkbGenerator", {0}},
-	{"hkbBehaviorGraphStringData", {4294967295}},
-	{"hkbEventInfo", {0}},
-	{"hkbBehaviorGraphData", {4294967295}},
-	{"hkbBehaviorGraph", {4294967295}},
-	{"hkbCharacter", {4294967295}},
-	{"hkbHandle", {4294967295}},
-	{"hkbAttachmentSetup", {4294967295}},
-	{"hkbAttachmentModifier", {4294967295}},
-	{"hkbAttributeModifierAssignment", {0}},
-	{"hkbAttributeModifier", {4294967295}},
-	{"hkbGeneratorSyncInfoSyncPoint", {0}},
-	{"hkbGeneratorSyncInfo", {0}},
-	{"hkbNodeInternalStateInfo", {4294967295}},
-	{"hkbBehaviorGraphInternalState", {4294967295}},
-	{"hkbBehaviorReferenceGenerator", {4294967295}},
-	{"hkbBoneWeightArray", {4294967295}},
-	{"hkbBlenderGeneratorChild", {4294967295}},
-	{"hkbBlenderGenerator", {4294967295}},
-	{"hkbBlenderGeneratorChildInternalState", {0}},
-	{"hkbBlenderGeneratorInternalState", {4294967295}},
-	{"hkbTransitionEffect", {0}},
-	{"hkbBlendingTransitionEffect", {4294967295}},
-	{"hkbBlendingTransitionEffectInternalState", {4294967295}},
-	{"hkbBoneIndexArray", {4294967295}},
-	{"hkbBoolVariableSequencedDataSample", {0}},
-	{"hkbSequencedData", {0}},
-	{"hkbBoolVariableSequencedData", {4294967295}},
-	{"hkbCharacterControllerControlData", {0}},
-	{"hkbCharacterControllerModifier", {4294967295}},
-	{"hkbCharacterControllerModifierInternalState", {4294967295}},
-	{"hkbClipTrigger", {0}},
-	{"hkbClipTriggerArray", {4294967295}},
-	{"hkbClipGenerator", {4294967295}},
-	{"hkbClipGeneratorEcho", {0}},
-	{"hkbClipGeneratorInternalState", {4294967295}},
-	{"hkbCombineTransformsModifier", {4294967295}},
-	{"hkbCombineTransformsModifierInternalState", {4294967295}},
-	{"hkbCompiledExpressionSetToken", {0}},
-	{"hkbCompiledExpressionSet", {4294967295}},
-	{"hkbComputeDirectionModifier", {4294967295}},
-	{"hkbComputeDirectionModifierInternalState", {4294967295}},
-	{"hkbComputeRotationFromAxisAngleModifier", {4294967295}},
-	{"hkbComputeRotationFromAxisAngleModifierInternalState", {4294967295}},
-	{"hkbComputeRotationToTargetModifier", {4294967295}},
-	{"hkbComputeRotationToTargetModifierInternalState", {4294967295}},
-	{"hkbDampingModifier", {4294967295}},
-	{"hkbDampingModifierInternalState", {4294967295}},
-	{"hkbModifierWrapper", {4294967295}},
-	{"hkbDelayedModifier", {4294967295}},
-	{"hkbDelayedModifierInternalState", {4294967295}},
-	{"hkbDetectCloseToGroundModifier", {4294967295}},
-	{"hkbDetectCloseToGroundModifierInternalState", {4294967295}},
-	{"hkbExpressionData", {0}},
-	{"hkbExpressionDataArray", {4294967295}},
-	{"hkbEvaluateExpressionModifier", {4294967295}},
-	{"hkbEvaluateExpressionModifierInternalExpressionData", {0}},
-	{"hkbEvaluateExpressionModifierInternalState", {4294967295}},
-	{"hkbEvaluateHandleModifier", {4294967295}},
-	{"hkbEventDrivenModifier", {4294967295}},
-	{"hkbEventDrivenModifierInternalState", {4294967295}},
-	{"hkbEventPayloadList", {4294967295}},
-	{"hkbEventRangeData", {0}},
-	{"hkbEventRangeDataArray", {4294967295}},
-	{"hkbEvent", {0}},
-	{"hkbEventSequencedDataSequencedEvent", {0}},
-	{"hkbEventSequencedData", {4294967295}},
-	{"hkbEventsFromRangeModifier", {4294967295}},
-	{"hkbEventsFromRangeModifierInternalState", {4294967295}},
-	{"hkbCondition", {0}},
-	{"hkbExpressionCondition", {4294967295}},
-	{"hkbExtractRagdollPoseModifier", {4294967295}},
-	{"hkbExtrapolatingTransitionEffect", {4294967295}},
-	{"hkbExtrapolatingTransitionEffectInternalState", {4294967295}},
-	{"hkbFootIkGains", {0}},
-	{"hkbFootIkControlData", {0}},
-	{"hkbFootIkControlsModifierLeg", {0}},
-	{"hkbFootIkControlsModifier", {4294967295}},
-	{"hkbFootIkModifierLeg", {0}},
-	{"hkbFootIkModifierInternalLegData", {0}},
-	{"hkbFootIkModifier", {4294967295}},
-	{"hkbGeneratorTransitionEffect", {4294967295}},
-	{"hkbGeneratorTransitionEffectInternalState", {4294967295}},
-	{"hkbGetHandleOnBoneModifier", {4294967295}},
-	{"hkbGetUpModifier", {4294967295}},
-	{"hkbGetUpModifierInternalState", {4294967295}},
-	{"hkbGetWorldFromModelModifier", {4294967295}},
-	{"hkbGetWorldFromModelModifierInternalState", {4294967295}},
-	{"hkbHandIkControlData", {0}},
-	{"hkbHandIkControlsModifierHand", {0}},
-	{"hkbHandIkControlsModifier", {4294967295}},
-	{"hkbHandIkModifierHand", {0}},
-	{"hkbHandIkModifier", {4294967295}},
-	{"hkbIntEventPayload", {4294967295}},
-	{"hkbIntVariableSequencedDataSample", {0}},
-	{"hkbIntVariableSequencedData", {4294967295}},
-	{"hkbJigglerGroup", {4294967295}},
-	{"hkbJigglerModifier", {4294967295}},
-	{"hkbJigglerModifierInternalState", {4294967295}},
-	{"hkbKeyframeBonesModifierKeyframeInfo", {0}},
-	{"hkbKeyframeBonesModifier", {4294967295}},
-	{"hkbLookAtModifier", {4294967295}},
-	{"hkbLookAtModifierInternalState", {4294967295}},
-	{"hkbManualSelectorGenerator", {4294967295}},
-	{"hkbManualSelectorGeneratorInternalState", {4294967295}},
-	{"hkbMirrorModifier", {4294967295}},
-	{"hkbModifierGenerator", {4294967295}},
-	{"hkbModifierList", {4294967295}},
-	{"hkbMoveCharacterModifier", {4294967295}},
-	{"hkbMoveCharacterModifierInternalState", {4294967295}},
-	{"hkbNamedEventPayload", {4294967295}},
-	{"hkbNamedIntEventPayload", {4294967295}},
-	{"hkbNamedRealEventPayload", {4294967295}},
-	{"hkbNamedStringEventPayload", {4294967295}},
-	{"hkbPoseMatchingGenerator", {4294967295}},
-	{"hkbPoseMatchingGeneratorInternalState", {4294967295}},
-	{"hkbRegisteredGenerator", {4294967295}},
-	{"hkbPositionRelativeSelectorGenerator", {4294967295}},
-	{"hkbPositionRelativeSelectorGeneratorInternalState", {4294967295}},
-	{"hkbPoweredRagdollControlData", {0}},
-	{"hkbWorldFromModelModeData", {0}},
-	{"hkbPoweredRagdollControlsModifier", {4294967295}},
-	{"hkbProxyModifierProxyInfo", {0}},
-	{"hkbProxyModifier", {4294967295}},
-	{"hkbRealEventPayload", {4294967295}},
-	{"hkbRealVariableSequencedDataSample", {0}},
-	{"hkbRealVariableSequencedData", {4294967295}},
-	{"hkbReferencePoseGenerator", {4294967295}},
-	{"hkaKeyFrameHierarchyUtilityControlData", {0}},
-	{"hkbRigidBodyRagdollControlData", {0}},
-	{"hkbRigidBodyRagdollControlsModifier", {4294967295}},
-	{"hkbRotateCharacterModifier", {4294967295}},
-	{"hkbRotateCharacterModifierInternalState", {4294967295}},
-	{"hkbSenseHandleModifierRange", {0}},
-	{"hkbSenseHandleModifier", {4294967295}},
-	{"hkbSequenceStringData", {4294967295}},
-	{"hkbSequence", {4294967295}},
-	{"hkbSequenceInternalState", {4294967295}},
-	{"hkbSetWorldFromModelModifier", {4294967295}},
-	{"hkbSplinePathGenerator", {4294967295}},
-	{"hkbSplinePathGeneratorInternalState", {4294967295}},
-	{"hkbStateListener", {4294967295}},
-	{"hkbStateChooser", {0}},
-	{"hkbStateMachineEventPropertyArray", {4294967295}},
-	{"hkbStateMachineTimeInterval", {0}},
-	{"hkbStateMachineTransitionInfo", {0}},
-	{"hkbStateMachineTransitionInfoArray", {4294967295}},
-	{"hkbStateMachineStateInfo", {4294967295}},
-	{"hkbStateMachine", {4294967295}},
-	{"hkbStateMachineTransitionInfoReference", {0}},
-	{"hkbStateMachineProspectiveTransitionInfo", {0}},
-	{"hkbStateMachineDelayedTransitionInfo", {0}},
-	{"hkbStateMachineActiveTransitionInfo", {0}},
-	{"hkbStateMachineInternalState", {4294967295}},
-	{"hkbStringCondition", {4294967295}},
-	{"hkbStringEventPayload", {4294967295}},
-	{"hkbTimerModifier", {4294967295}},
-	{"hkbTimerModifierInternalState", {4294967295}},
-	{"hkbTransformVectorModifier", {4294967295}},
-	{"hkbTransformVectorModifierInternalState", {4294967295}},
-	{"hkbTwistModifier", {4294967295}},
-	{"hkbAlignBoneModifier", {4294967295}},
-	{"hkbAnimatedSkeletonGenerator", {4294967295}},
-	{"hkbAuxiliaryNodeInfo", {4294967295}},
-	{"hkbBalanceModifierStepInfo", {0}},
-	{"hkbBalanceModifier", {4294967295}},
-	{"hkbRadialSelectorGeneratorGeneratorInfo", {0}},
-	{"hkbRadialSelectorGeneratorGeneratorPair", {0}},
-	{"hkbRadialSelectorGenerator", {4294967295}},
-	{"hkbCheckBalanceModifier", {4294967295}},
-	{"hkbBalanceRadialSelectorGenerator", {4294967295}},
-	{"hkbBehaviorEventsInfo", {4294967295}},
-	{"hkbBehaviorGraphInternalStateInfo", {4294967295}},
-	{"hkbBehaviorInfoIdToNamePair", {0}},
-	{"hkbBehaviorInfo", {4294967295}},
-	{"hkbCameraShakeEventPayload", {4294967295}},
-	{"hkbCatchFallModifierHand", {0}},
-	{"hkbCatchFallModifier", {4294967295}},
-	{"hkbCharacterAddedInfo", {4294967295}},
-	{"hkbCharacterControlCommand", {4294967295}},
-	{"hkbCharacterInfo", {4294967295}},
-	{"hkbCharacterSkinInfo", {4294967295}},
-	{"hkbCharacterSteppedInfo", {4294967295}},
-	{"hkbCheckRagdollSpeedModifier", {4294967295}},
-	{"hkbClientCharacterState", {4294967295}},
-	{"hkbComputeWorldFromModelModifier", {4294967295}},
-	{"hkbTarget", {4294967295}},
-	{"hkbConstrainRigidBodyModifier", {4294967295}},
-	{"hkbControlledReachModifier", {4294967295}},
-	{"hkbCustomTestGeneratorStruck", {0}},
-	{"hkbCustomTestGenerator", {4294967295}},
-	{"hkbDemoConfigCharacterInfo", {4294967295}},
-	{"hkbDemoConfigStickVariableInfo", {0}},
-	{"hkbDemoConfigTerrainInfo", {0}},
-	{"hkbDemoConfig", {4294967295}},
-	{"hkbEventRaisedInfo", {4294967295}},
-	{"hkbFaceTargetModifier", {4294967295}},
-	{"hkbGravityModifier", {4294967295}},
-	{"hkbHoldFromBlendingTransitionEffect", {4294967295}},
-	{"hkbLinkedSymbolInfo", {4294967295}},
-	{"hkbMoveBoneTowardTargetModifier", {4294967295}},
-	{"hkbParticleSystemEventPayload", {4294967295}},
-	{"hkbGeneratorOutputListener", {0}},
-	{"hkbPoseStoringGeneratorOutputListenerStoredPose", {4294967295}},
-	{"hkbPoseStoringGeneratorOutputListener", {4294967295}},
-	{"hkbRaiseEventCommand", {4294967295}},
-	{"hkbReachModifierHand", {0}},
-	{"hkbReachModifier", {4294967295}},
-	{"hkbReachTowardTargetModifierHand", {0}},
-	{"hkbReachTowardTargetModifier", {4294967295}},
-	{"hkbSetBehaviorCommand", {4294967295}},
-	{"hkbSetLocalTimeOfClipGeneratorCommand", {4294967295}},
-	{"hkbSetNodePropertyCommand", {4294967295}},
-	{"hkbSetWordVariableCommand", {4294967295}},
-	{"hkbSimulationControlCommand", {4294967295}},
-	{"hkbSimulationStateInfo", {4294967295}},
-	{"hkbStateDependentModifier", {4294967295}},
-	{"hkbTargetRigidBodyModifier", {4294967295}},
-	{"hkbTestStateChooser", {4294967295}},
-	{"BGSGamebryoSequenceGenerator", {4294967295}},
-	{"BSBoneSwitchGeneratorBoneData", {4294967295}},
-	{"BSBoneSwitchGenerator", {4294967295}},
-	{"BSComputeAddBoneAnimModifier", {4294967295}},
-	{"BSCyclicBlendTransitionGenerator", {4294967295}},
-	{"BSDecomposeVectorModifier", {4294967295}},
-	{"BSDirectAtModifier", {4294967295}},
-	{"BSDistTriggerModifier", {4294967295}},
-	{"BSEventEveryNEventsModifier", {4294967295}},
-	{"BSEventOnDeactivateModifier", {4294967295}},
-	{"BSEventOnFalseToTrueModifier", {4294967295}},
-	{"BSGetTimeStepModifier", {4294967295}},
-	{"BSIStateManagerModifierBSiStateData", {0}},
-	{"BSIStateManagerModifierBSIStateManagerStateListener", {4294967295}},
-	{"BSIStateManagerModifier", {4294967295}},
-	{"BSInterpValueModifier", {4294967295}},
-	{"BSIsActiveModifier", {4294967295}},
-	{"BSLimbIKModifier", {4294967295}},
-	{"BSLookAtModifierBoneData", {0}},
-	{"BSLookAtModifier", {4294967295}},
-	{"BSModifyOnceModifier", {4294967295}},
-	{"BSOffsetAnimationGenerator", {4294967295}},
-	{"BSPassByTargetTriggerModifier", {4294967295}},
-	{"BSRagdollContactListenerModifier", {4294967295}},
-	{"BSSpeedSamplerModifier", {4294967295}},
-	{"BSSynchronizedClipGenerator", {4294967295}},
-	{"BSTimerModifier", {4294967295}},
-	{"BSTweenerModifier", {4294967295}},
-	{"BSiStateTaggingGenerator", {4294967295}},
-	{"hkAabbHalf", {0}},
-	{"hkAabbUint32", {0}},
-	{"hkArrayTypeAttribute", {0}},
-	{"hkBitField", {0}},
-	{"hkCustomAttributesAttribute", {0}},
-	{"hkCustomAttributes", {0}},
-	{"hkClassEnumItem", {0}},
-	{"hkClassEnum", {0}},
-	{"hkClassMember", {0}},
-	{"hkClass", {0}},
-	{"hkColor", {0}},
-	{"hkContactPointMaterial", {0}},
-	{"hkDataObjectTypeAttribute", {0}},
-	{"hkDescriptionAttribute", {0}},
-	{"hkDocumentationAttribute", {0}},
-	{"hkGeometryTriangle", {0}},
-	{"hkGeometry", {0}},
-	{"hkGizmoAttribute", {0}},
-	{"hkHalf8", {0}},
-	{"hkLinkAttribute", {0}},
-	{"hkMemoryTrackerAttribute", {0}},
-	{"hkModelerNodeTypeAttribute", {0}},
-	{"hkPackedVector3", {0}},
-	{"hkPostFinishAttribute", {0}},
-	{"hkQTransform", {0}},
-	{"hkRangeInt32Attribute", {0}},
-	{"hkRangeRealAttribute", {0}},
-	{"hkReflectedFileAttribute", {0}},
-	{"hkSemanticsAttribute", {0}},
-	{"hkSphere", {0}},
-	{"hkTraceStreamTitle", {0}},
-	{"hkUiAttribute", {0}},
-	{"hkMonitorStreamFrameInfo", {0}},
-	{"hkMonitorStreamStringMapStringMap", {0}},
-	{"hkMonitorStreamStringMap", {0}},
-	{"hkPackfileHeader", {0}},
-	{"hkPackfileSectionHeader", {0}},
-	{"hkRootLevelContainerNamedVariant", {0}},
-	{"hkRootLevelContainer", {0}},
-	{"hkMeshSection", {0}},
-	{"hkpMassProperties", {0}},
-	{"hkpWeldingUtility", {0}},
-	{"hkpCenterOfMassChangerModifierConstraintAtom", {0}},
-	{"hkpIgnoreModifierConstraintAtom", {0}},
-	{"hkpMassChangerModifierConstraintAtom", {0}},
-	{"hkpMovingSurfaceModifierConstraintAtom", {0}},
-	{"hkpOverwritePivotConstraintAtom", {0}},
-	{"hkpSoftContactModifierConstraintAtom", {0}},
-	{"hkpViscousSurfaceModifierConstraintAtom", {0}},
-	{"hkpMoppCodeReindexedTerminal", {0}},
-	{"hkaQuantizedAnimationTrackCompressionParams", {0}},
-	{"hkaSplineCompressedAnimationAnimationCompressionParams", {0}},
-	{"hkaSplineCompressedAnimationTrackCompressionParams", {0}},
-	{"hkaWaveletCompressedAnimationCompressionParams", {0}},
-	{"hkaKeyFrameHierarchyUtility", {0}},
-	{"hkbBlendCurveUtils", {0}},
-	{"hkbContext", {0}},
-	{"hkbDefaultMessageLog", {0}},
-	{"hkbMessageLog", {0}},
-	{"hkbStateMachineNestedStateMachineData", {0}},
-	{"hkbWorldEnums", {0}},
-	{"hkVariableTweakingHelperBoolVariableInfo", {0}},
-	{"hkVariableTweakingHelperVector4VariableInfo", {0}},
-	{"hkVariableTweakingHelperRealVariableInfo", {0}},
-	{"hkVariableTweakingHelperIntVariableInfo", {0}},
-	{"hkVariableTweakingHelper", {0}},
-	{"hkpCollidableCollidableFilter", {0}},
-	{"hkpPhantomCallbackShape", {0}},
-	{"hkpRayCollidableFilter", {0}},
-	{"hkpRayShapeCollectionFilter", {0}},
-	{"hkpShapeCollectionFilter", {0}},
-	{"hkpShapeModifier", {0}},
-	{"hkpArrayAction", {0}},
-	{"hkpBreakableBody", {0}},
-};
-
-bool has_vtable(std::string className)
-{
-	auto it = typeinfos.find(className);
-	if (it != typeinfos.end())
-	{
-		return it->second.vtable != 0;
-	}
-	return false;
-}
+class HavokUtils {
+private:
+  std::map<std::string, typeinfo> typeinfos = {
+      {"hkBaseObject",
+       {4294967295, 4,
+        [](void *mem) -> void * { return new (mem) hkBaseObject(); }}},
+      {"hkReferencedObject",
+       {4294967295, 8,
+        [](void *mem) -> void * { return new (mem) hkReferencedObject(); }}},
+      {"hkLocalFrameGroup",
+       {4294967295, 12,
+        [](void *mem) -> void * { return new (mem) hkLocalFrameGroup(); }}},
+      {"hkLocalFrame",
+       {0, 8, [](void *mem) -> void * { return new (mem) hkLocalFrame(); }}},
+      {"hkSimpleLocalFrame",
+       {4294967295, 112,
+        [](void *mem) -> void * { return new (mem) hkSimpleLocalFrame(); }}},
+      {"hkTrackerSerializableScanSnapshotAllocation",
+       {0, 12,
+        [](void *mem) -> void * {
+          return new (mem) hkTrackerSerializableScanSnapshotAllocation();
+        }}},
+      {"hkTrackerSerializableScanSnapshotBlock",
+       {0, 24,
+        [](void *mem) -> void * {
+          return new (mem) hkTrackerSerializableScanSnapshotBlock();
+        }}},
+      {"hkTrackerSerializableScanSnapshot",
+       {4294967295, 92,
+        [](void *mem) -> void * {
+          return new (mem) hkTrackerSerializableScanSnapshot();
+        }}},
+      {"hkMonitorStreamColorTableColorPair",
+       {0, 8,
+        [](void *mem) -> void * {
+          return new (mem) hkMonitorStreamColorTableColorPair();
+        }}},
+      {"hkMonitorStreamColorTable",
+       {4294967295, 24,
+        [](void *mem) -> void * {
+          return new (mem) hkMonitorStreamColorTable();
+        }}},
+      {"hkResourceBase",
+       {0, 8, [](void *mem) -> void * { return new (mem) hkResourceBase(); }}},
+      {"hkResourceHandle",
+       {0, 8,
+        [](void *mem) -> void * { return new (mem) hkResourceHandle(); }}},
+      {"hkMemoryResourceHandleExternalLink",
+       {0, 8,
+        [](void *mem) -> void * {
+          return new (mem) hkMemoryResourceHandleExternalLink();
+        }}},
+      {"hkMemoryResourceHandle",
+       {4294967295, 28,
+        [](void *mem) -> void * {
+          return new (mem) hkMemoryResourceHandle();
+        }}},
+      {"hkResourceContainer",
+       {0, 8,
+        [](void *mem) -> void * { return new (mem) hkResourceContainer(); }}},
+      {"hkMemoryResourceContainer",
+       {4294967295, 40,
+        [](void *mem) -> void * {
+          return new (mem) hkMemoryResourceContainer();
+        }}},
+      {"hkAlignSceneToNodeOptions",
+       {4294967295, 24,
+        [](void *mem) -> void * {
+          return new (mem) hkAlignSceneToNodeOptions();
+        }}},
+      {"hkxAnimatedFloat",
+       {4294967295, 24,
+        [](void *mem) -> void * { return new (mem) hkxAnimatedFloat(); }}},
+      {"hkxAnimatedMatrix",
+       {4294967295, 24,
+        [](void *mem) -> void * { return new (mem) hkxAnimatedMatrix(); }}},
+      {"hkxAnimatedQuaternion",
+       {4294967295, 20,
+        [](void *mem) -> void * { return new (mem) hkxAnimatedQuaternion(); }}},
+      {"hkxAnimatedVector",
+       {4294967295, 24,
+        [](void *mem) -> void * { return new (mem) hkxAnimatedVector(); }}},
+      {"hkxAttribute",
+       {0, 8, [](void *mem) -> void * { return new (mem) hkxAttribute(); }}},
+      {"hkxAttributeGroup",
+       {0, 16,
+        [](void *mem) -> void * { return new (mem) hkxAttributeGroup(); }}},
+      {"hkxAttributeHolder",
+       {4294967295, 20,
+        [](void *mem) -> void * { return new (mem) hkxAttributeHolder(); }}},
+      {"hkxCamera",
+       {4294967295, 80,
+        [](void *mem) -> void * { return new (mem) hkxCamera(); }}},
+      {"hkxEdgeSelectionChannel",
+       {4294967295, 20,
+        [](void *mem) -> void * {
+          return new (mem) hkxEdgeSelectionChannel();
+        }}},
+      {"hkxEnumItem",
+       {0, 8, [](void *mem) -> void * { return new (mem) hkxEnumItem(); }}},
+      {"hkxEnum",
+       {4294967295, 20,
+        [](void *mem) -> void * { return new (mem) hkxEnum(); }}},
+      {"hkxEnvironmentVariable",
+       {0, 8,
+        [](void *mem) -> void * {
+          return new (mem) hkxEnvironmentVariable();
+        }}},
+      {"hkxEnvironment",
+       {4294967295, 20,
+        [](void *mem) -> void * { return new (mem) hkxEnvironment(); }}},
+      {"hkxIndexBuffer",
+       {4294967295, 44,
+        [](void *mem) -> void * { return new (mem) hkxIndexBuffer(); }}},
+      {"hkxLight",
+       {4294967295, 64,
+        [](void *mem) -> void * { return new (mem) hkxLight(); }}},
+      {"hkxMaterialTextureStage",
+       {0, 12,
+        [](void *mem) -> void * {
+          return new (mem) hkxMaterialTextureStage();
+        }}},
+      {"hkxMaterialProperty",
+       {0, 8,
+        [](void *mem) -> void * { return new (mem) hkxMaterialProperty(); }}},
+      {"hkxMaterial",
+       {4294967295, 144,
+        [](void *mem) -> void * { return new (mem) hkxMaterial(); }}},
+      {"hkxMaterialEffect",
+       {4294967295, 28,
+        [](void *mem) -> void * { return new (mem) hkxMaterialEffect(); }}},
+      {"hkxMaterialShader",
+       {4294967295, 40,
+        [](void *mem) -> void * { return new (mem) hkxMaterialShader(); }}},
+      {"hkxMaterialShaderSet",
+       {4294967295, 20,
+        [](void *mem) -> void * { return new (mem) hkxMaterialShaderSet(); }}},
+      {"hkxVertexDescriptionElementDecl",
+       {0, 16,
+        [](void *mem) -> void * {
+          return new (mem) hkxVertexDescriptionElementDecl();
+        }}},
+      {"hkxVertexDescription",
+       {0, 12,
+        [](void *mem) -> void * { return new (mem) hkxVertexDescription(); }}},
+      {"hkxVertexBufferVertexData",
+       {0, 84,
+        [](void *mem) -> void * {
+          return new (mem) hkxVertexBufferVertexData();
+        }}},
+      {"hkxVertexBuffer",
+       {4294967295, 104,
+        [](void *mem) -> void * { return new (mem) hkxVertexBuffer(); }}},
+      {"hkxMeshSection",
+       {4294967295, 40,
+        [](void *mem) -> void * { return new (mem) hkxMeshSection(); }}},
+      {"hkxMeshUserChannelInfo",
+       {4294967295, 28,
+        [](void *mem) -> void * {
+          return new (mem) hkxMeshUserChannelInfo();
+        }}},
+      {"hkxMesh",
+       {4294967295, 32,
+        [](void *mem) -> void * { return new (mem) hkxMesh(); }}},
+      {"hkxNodeAnnotationData",
+       {0, 8,
+        [](void *mem) -> void * { return new (mem) hkxNodeAnnotationData(); }}},
+      {"hkxNode",
+       {4294967295, 72,
+        [](void *mem) -> void * { return new (mem) hkxNode(); }}},
+      {"hkxNodeSelectionSet",
+       {4294967295, 36,
+        [](void *mem) -> void * { return new (mem) hkxNodeSelectionSet(); }}},
+      {"hkxTextureInplace",
+       {4294967295, 32,
+        [](void *mem) -> void * { return new (mem) hkxTextureInplace(); }}},
+      {"hkxSkinBinding",
+       {4294967295, 112,
+        [](void *mem) -> void * { return new (mem) hkxSkinBinding(); }}},
+      {"hkxTextureFile",
+       {4294967295, 20,
+        [](void *mem) -> void * { return new (mem) hkxTextureFile(); }}},
+      {"hkxScene",
+       {4294967295, 176,
+        [](void *mem) -> void * { return new (mem) hkxScene(); }}},
+      {"hkxSparselyAnimatedBool",
+       {4294967295, 32,
+        [](void *mem)
+            -> void * { return new (mem) hkxSparselyAnimatedBool(); }}},
+      {"hkxSparselyAnimatedInt",
+       {4294967295, 32,
+        [](void *mem)
+            -> void * { return new (mem) hkxSparselyAnimatedInt(); }}},
+      {"hkxSparselyAnimatedEnum",
+       {4294967295, 36,
+        [](void *mem)
+            -> void * { return new (mem) hkxSparselyAnimatedEnum(); }}},
+      {"hkxSparselyAnimatedString",
+       {4294967295, 32,
+        [](void *mem)
+            -> void * { return new (mem) hkxSparselyAnimatedString(); }}},
+      {"hkxTriangleSelectionChannel",
+       {4294967295, 20,
+        [](void *mem)
+            -> void * { return new (mem) hkxTriangleSelectionChannel(); }}},
+      {"hkxVertexFloatDataChannel",
+       {4294967295, 24,
+        [](void *mem)
+            -> void * { return new (mem) hkxVertexFloatDataChannel(); }}},
+      {"hkxVertexIntDataChannel",
+       {4294967295, 20,
+        [](void *mem)
+            -> void * { return new (mem) hkxVertexIntDataChannel(); }}},
+      {"hkxVertexSelectionChannel",
+       {4294967295, 20,
+        [](void *mem)
+            -> void * { return new (mem) hkxVertexSelectionChannel(); }}},
+      {"hkxVertexVectorDataChannel",
+       {4294967295, 20,
+        [](void *mem)
+            -> void * { return new (mem) hkxVertexVectorDataChannel(); }}},
+      {"hkMeshBoneIndexMapping",
+       {0, 12,
+        [](void *mem)
+            -> void * { return new (mem) hkMeshBoneIndexMapping(); }}},
+      {"hkIndexedTransformSet",
+       {4294967295, 72,
+        [](void *mem) -> void * { return new (mem) hkIndexedTransformSet(); }}},
+      {"hkMeshBody",
+       {0, 8, [](void *mem) -> void * { return new (mem) hkMeshBody(); }}},
+      {"hkMeshShape",
+       {0, 8, [](void *mem) -> void * { return new (mem) hkMeshShape(); }}},
+      {"hkMeshVertexBuffer",
+       {0, 8,
+        [](void *mem) -> void * { return new (mem) hkMeshVertexBuffer(); }}},
+      {"hkMemoryMeshBody",
+       {4294967295, 112,
+        [](void *mem) -> void * { return new (mem) hkMemoryMeshBody(); }}},
+      {"hkMeshMaterial",
+       {0, 8, [](void *mem) -> void * { return new (mem) hkMeshMaterial(); }}},
+      {"hkMeshTexture",
+       {0, 8, [](void *mem) -> void * { return new (mem) hkMeshTexture(); }}},
+      {"hkMemoryMeshMaterial",
+       {4294967295, 24,
+        [](void *mem) -> void * { return new (mem) hkMemoryMeshMaterial(); }}},
+      {"hkMeshSectionCinfo",
+       {0, 32,
+        [](void *mem) -> void * { return new (mem) hkMeshSectionCinfo(); }}},
+      {"hkMemoryMeshShape",
+       {4294967295, 48,
+        [](void *mem) -> void * { return new (mem) hkMemoryMeshShape(); }}},
+      {"hkMemoryMeshTexture",
+       {4294967295, 32,
+        [](void *mem) -> void * { return new (mem) hkMemoryMeshTexture(); }}},
+      {"hkVertexFormatElement",
+       {0, 8,
+        [](void *mem) -> void * { return new (mem) hkVertexFormatElement(); }}},
+      {"hkVertexFormat",
+       {0, 260,
+        [](void *mem) -> void * { return new (mem) hkVertexFormat(); }}},
+      {"hkMemoryMeshVertexBuffer",
+       {4294967295, 424,
+        [](void *mem)
+            -> void * { return new (mem) hkMemoryMeshVertexBuffer(); }}},
+      {"hkMultipleVertexBufferVertexBufferInfo",
+       {0, 12,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkMultipleVertexBufferVertexBufferInfo();
+                          }}},
+      {"hkMultipleVertexBufferLockedElement",
+       {0, 7,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkMultipleVertexBufferLockedElement();
+                          }}},
+      {"hkMultipleVertexBufferElementInfo",
+       {0, 2,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkMultipleVertexBufferElementInfo();
+                          }}},
+      {"hkMultipleVertexBuffer",
+       {4294967295, 324,
+        [](void *mem)
+            -> void * { return new (mem) hkMultipleVertexBuffer(); }}},
+      {"hkpShape",
+       {0, 16, [](void *mem) -> void * { return new (mem) hkpShape(); }}},
+      {"hkpSphereRepShape",
+       {0, 16,
+        [](void *mem) -> void * { return new (mem) hkpSphereRepShape(); }}},
+      {"hkpConvexShape",
+       {0, 20, [](void *mem) -> void * { return new (mem) hkpConvexShape(); }}},
+      {"hkpBoxShape",
+       {4294967295, 48,
+        [](void *mem) -> void * { return new (mem) hkpBoxShape(); }}},
+      {"hkpShapeContainer",
+       {0, 4,
+        [](void *mem) -> void * { return new (mem) hkpShapeContainer(); }}},
+      {"hkpSingleShapeContainer",
+       {4294967295, 8,
+        [](void *mem)
+            -> void * { return new (mem) hkpSingleShapeContainer(); }}},
+      {"hkpBvShape",
+       {4294967295, 28,
+        [](void *mem) -> void * { return new (mem) hkpBvShape(); }}},
+      {"hkpCapsuleShape",
+       {4294967295, 64,
+        [](void *mem) -> void * { return new (mem) hkpCapsuleShape(); }}},
+      {"hkpCollisionFilter",
+       {0, 48,
+        [](void *mem) -> void * { return new (mem) hkpCollisionFilter(); }}},
+      {"hkpCollisionFilterList",
+       {4294967295, 60,
+        [](void *mem)
+            -> void * { return new (mem) hkpCollisionFilterList(); }}},
+      {"hkpConvexListShape",
+       {4294967295, 80,
+        [](void *mem) -> void * { return new (mem) hkpConvexListShape(); }}},
+      {"hkpConvexTransformShapeBase",
+       {0, 32,
+        [](void *mem)
+            -> void * { return new (mem) hkpConvexTransformShapeBase(); }}},
+      {"hkpConvexTransformShape",
+       {4294967295, 96,
+        [](void *mem)
+            -> void * { return new (mem) hkpConvexTransformShape(); }}},
+      {"hkpConvexTranslateShape",
+       {4294967295, 48,
+        [](void *mem)
+            -> void * { return new (mem) hkpConvexTranslateShape(); }}},
+      {"hkpConvexVerticesConnectivity",
+       {4294967295, 32,
+        [](void *mem)
+            -> void * { return new (mem) hkpConvexVerticesConnectivity(); }}},
+      {"hkpCylinderShape",
+       {4294967295, 96,
+        [](void *mem) -> void * { return new (mem) hkpCylinderShape(); }}},
+      {"hkpConvexListFilter",
+       {0, 8,
+        [](void *mem) -> void * { return new (mem) hkpConvexListFilter(); }}},
+      {"hkpDefaultConvexListFilter",
+       {4294967295, 8,
+        [](void *mem)
+            -> void * { return new (mem) hkpDefaultConvexListFilter(); }}},
+      {"hkpGroupFilter",
+       {4294967295, 256,
+        [](void *mem) -> void * { return new (mem) hkpGroupFilter(); }}},
+      {"hkpListShapeChildInfo",
+       {0, 16,
+        [](void *mem) -> void * { return new (mem) hkpListShapeChildInfo(); }}},
+      {"hkpShapeCollection",
+       {0, 24,
+        [](void *mem) -> void * { return new (mem) hkpShapeCollection(); }}},
+      {"hkpListShape",
+       {4294967295, 112,
+        [](void *mem) -> void * { return new (mem) hkpListShape(); }}},
+      {"hkpBvTreeShape",
+       {0, 20, [](void *mem) -> void * { return new (mem) hkpBvTreeShape(); }}},
+      {"hkpMoppCodeCodeInfo",
+       {0, 16,
+        [](void *mem) -> void * { return new (mem) hkpMoppCodeCodeInfo(); }}},
+      {"hkpMoppCode",
+       {4294967295, 48,
+        [](void *mem) -> void * { return new (mem) hkpMoppCode(); }}},
+      {"hkMoppBvTreeShapeBase",
+       {0, 48,
+        [](void *mem) -> void * { return new (mem) hkMoppBvTreeShapeBase(); }}},
+      {"hkpMoppBvTreeShape",
+       {4294967295, 64,
+        [](void *mem) -> void * { return new (mem) hkpMoppBvTreeShape(); }}},
+      {"hkpMultiRayShapeRay",
+       {0, 32,
+        [](void *mem) -> void * { return new (mem) hkpMultiRayShapeRay(); }}},
+      {"hkpMultiRayShape",
+       {4294967295, 32,
+        [](void *mem) -> void * { return new (mem) hkpMultiRayShape(); }}},
+      {"hkpMultiSphereShape",
+       {4294967295, 160,
+        [](void *mem) -> void * { return new (mem) hkpMultiSphereShape(); }}},
+      {"hkpNullCollisionFilter",
+       {4294967295, 48,
+        [](void *mem)
+            -> void * { return new (mem) hkpNullCollisionFilter(); }}},
+      {"hkpRemoveTerminalsMoppModifier",
+       {4294967295, 28,
+        [](void *mem)
+            -> void * { return new (mem) hkpRemoveTerminalsMoppModifier(); }}},
+      {"hkpShapeInfo",
+       {4294967295, 112,
+        [](void *mem) -> void * { return new (mem) hkpShapeInfo(); }}},
+      {"hkpSphereShape",
+       {4294967295, 32,
+        [](void *mem) -> void * { return new (mem) hkpSphereShape(); }}},
+      {"hkpTransformShape",
+       {4294967295, 112,
+        [](void *mem) -> void * { return new (mem) hkpTransformShape(); }}},
+      {"hkpTriangleShape",
+       {4294967295, 96,
+        [](void *mem) -> void * { return new (mem) hkpTriangleShape(); }}},
+      {"hkpCompressedMeshShapeChunk",
+       {0, 80,
+        [](void *mem)
+            -> void * { return new (mem) hkpCompressedMeshShapeChunk(); }}},
+      {"hkpMeshMaterial",
+       {0, 4, [](void *mem) -> void * { return new (mem) hkpMeshMaterial(); }}},
+      {"hkpNamedMeshMaterial",
+       {0, 8,
+        [](void *mem) -> void * { return new (mem) hkpNamedMeshMaterial(); }}},
+      {"hkpCompressedMeshShapeConvexPiece",
+       {0, 64,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpCompressedMeshShapeConvexPiece();
+                          }}},
+      {"hkpCompressedMeshShapeBigTriangle",
+       {0, 16,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpCompressedMeshShapeBigTriangle();
+                          }}},
+      {"hkAabb",
+       {0, 32, [](void *mem) -> void * { return new (mem) hkAabb(); }}},
+      {"hkpCompressedMeshShape",
+       {4294967295, 240,
+        [](void *mem)
+            -> void * { return new (mem) hkpCompressedMeshShape(); }}},
+      {"hkpConvexVerticesShapeFourVectors",
+       {0, 48,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpConvexVerticesShapeFourVectors();
+                          }}},
+      {"hkpConvexVerticesShape",
+       {4294967295, 112,
+        [](void *mem)
+            -> void * { return new (mem) hkpConvexVerticesShape(); }}},
+      {"hkpConvexPieceStreamData",
+       {4294967295, 44,
+        [](void *mem)
+            -> void * { return new (mem) hkpConvexPieceStreamData(); }}},
+      {"hkpConvexPieceMeshShape",
+       {4294967295, 36,
+        [](void *mem)
+            -> void * { return new (mem) hkpConvexPieceMeshShape(); }}},
+      {"hkpExtendedMeshShapeSubpart",
+       {0, 20,
+        [](void *mem)
+            -> void * { return new (mem) hkpExtendedMeshShapeSubpart(); }}},
+      {"hkpExtendedMeshShapeShapesSubpart",
+       {0, 64,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpExtendedMeshShapeShapesSubpart();
+                          }}},
+      {"hkpExtendedMeshShapeTrianglesSubpart",
+       {0, 112,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpExtendedMeshShapeTrianglesSubpart();
+                          }}},
+      {"hkpExtendedMeshShape",
+       {4294967295, 240,
+        [](void *mem) -> void * { return new (mem) hkpExtendedMeshShape(); }}},
+      {"hkpStorageExtendedMeshShapeMaterial",
+       {0, 12,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpStorageExtendedMeshShapeMaterial();
+                          }}},
+      {"hkpStorageExtendedMeshShapeMeshSubpartStorage",
+       {4294967295, 104,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpStorageExtendedMeshShapeMeshSubpartStorage();
+                          }}},
+      {"hkpStorageExtendedMeshShapeShapeSubpartStorage",
+       {4294967295, 44,
+        [](void *mem)
+            -> void
+                * {
+                  return new (mem)
+                      hkpStorageExtendedMeshShapeShapeSubpartStorage();
+                }}},
+      {"hkpStorageExtendedMeshShape",
+       {4294967295, 272,
+        [](void *mem)
+            -> void * { return new (mem) hkpStorageExtendedMeshShape(); }}},
+      {"hkpHeightFieldShape",
+       {0, 16,
+        [](void *mem) -> void * { return new (mem) hkpHeightFieldShape(); }}},
+      {"hkpSampledHeightFieldShape",
+       {0, 96,
+        [](void *mem)
+            -> void * { return new (mem) hkpSampledHeightFieldShape(); }}},
+      {"hkpCompressedSampledHeightFieldShape",
+       {4294967295, 128,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpCompressedSampledHeightFieldShape();
+                          }}},
+      {"hkpPlaneShape",
+       {4294967295, 64,
+        [](void *mem) -> void * { return new (mem) hkpPlaneShape(); }}},
+      {"hkpStorageSampledHeightFieldShape",
+       {4294967295, 112,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpStorageSampledHeightFieldShape();
+                          }}},
+      {"hkpTriSampledHeightFieldBvTreeShape",
+       {4294967295, 48,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpTriSampledHeightFieldBvTreeShape();
+                          }}},
+      {"hkpTriSampledHeightFieldCollection",
+       {4294967295, 64,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpTriSampledHeightFieldCollection();
+                          }}},
+      {"hkpMeshShapeSubpart",
+       {0, 56,
+        [](void *mem) -> void * { return new (mem) hkpMeshShapeSubpart(); }}},
+      {"hkpMeshShape",
+       {4294967295, 96,
+        [](void *mem) -> void * { return new (mem) hkpMeshShape(); }}},
+      {"hkpFastMeshShape",
+       {4294967295, 96,
+        [](void *mem) -> void * { return new (mem) hkpFastMeshShape(); }}},
+      {"hkpStorageMeshShapeSubpartStorage",
+       {4294967295, 80,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpStorageMeshShapeSubpartStorage();
+                          }}},
+      {"hkpStorageMeshShape",
+       {4294967295, 112,
+        [](void *mem) -> void * { return new (mem) hkpStorageMeshShape(); }}},
+      {"hkpSimpleMeshShapeTriangle",
+       {0, 16,
+        [](void *mem)
+            -> void * { return new (mem) hkpSimpleMeshShapeTriangle(); }}},
+      {"hkpSimpleMeshShape",
+       {4294967295, 68,
+        [](void *mem) -> void * { return new (mem) hkpSimpleMeshShape(); }}},
+      {"hkpPropertyValue",
+       {0, 8,
+        [](void *mem) -> void * { return new (mem) hkpPropertyValue(); }}},
+      {"hkpProperty",
+       {0, 16, [](void *mem) -> void * { return new (mem) hkpProperty(); }}},
+      {"hkpBroadPhaseHandle",
+       {0, 4,
+        [](void *mem) -> void * { return new (mem) hkpBroadPhaseHandle(); }}},
+      {"hkpTypedBroadPhaseHandle",
+       {0, 12,
+        [](void *mem)
+            -> void * { return new (mem) hkpTypedBroadPhaseHandle(); }}},
+      {"hkpCdBody",
+       {0, 16, [](void *mem) -> void * { return new (mem) hkpCdBody(); }}},
+      {"hkpCollidableBoundingVolumeData",
+       {0, 44,
+        [](void *mem)
+            -> void * { return new (mem) hkpCollidableBoundingVolumeData(); }}},
+      {"hkpCollidable",
+       {0, 80, [](void *mem) -> void * { return new (mem) hkpCollidable(); }}},
+      {"hkpLinkedCollidable",
+       {0, 92,
+        [](void *mem) -> void * { return new (mem) hkpLinkedCollidable(); }}},
+      {"hkMultiThreadCheck",
+       {0, 12,
+        [](void *mem) -> void * { return new (mem) hkMultiThreadCheck(); }}},
+      {"hkpWorldObject",
+       {0, 140,
+        [](void *mem) -> void * { return new (mem) hkpWorldObject(); }}},
+      {"hkpPhantom",
+       {0, 164, [](void *mem) -> void * { return new (mem) hkpPhantom(); }}},
+      {"hkpAabbPhantom",
+       {4294967295, 224,
+        [](void *mem) -> void * { return new (mem) hkpAabbPhantom(); }}},
+      {"hkpConstraintData",
+       {0, 12,
+        [](void *mem) -> void * { return new (mem) hkpConstraintData(); }}},
+      {"hkpConstraintAtom",
+       {0, 2,
+        [](void *mem) -> void * { return new (mem) hkpConstraintAtom(); }}},
+      {"hkpSetLocalTranslationsConstraintAtom",
+       {0, 48,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpSetLocalTranslationsConstraintAtom();
+                          }}},
+      {"hkpBallSocketConstraintAtom",
+       {0, 16,
+        [](void *mem)
+            -> void * { return new (mem) hkpBallSocketConstraintAtom(); }}},
+      {"hkpSetupStabilizationAtom",
+       {0, 16,
+        [](void *mem)
+            -> void * { return new (mem) hkpSetupStabilizationAtom(); }}},
+      {"hkpBallAndSocketConstraintDataAtoms",
+       {0, 80,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpBallAndSocketConstraintDataAtoms();
+                          }}},
+      {"hkpBallAndSocketConstraintData",
+       {4294967295, 96,
+        [](void *mem)
+            -> void * { return new (mem) hkpBallAndSocketConstraintData(); }}},
+      {"hkpBallSocketChainDataConstraintInfo",
+       {0, 32,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpBallSocketChainDataConstraintInfo();
+                          }}},
+      {"hkpBridgeConstraintAtom",
+       {0, 12,
+        [](void *mem)
+            -> void * { return new (mem) hkpBridgeConstraintAtom(); }}},
+      {"hkpBridgeAtoms",
+       {0, 12, [](void *mem) -> void * { return new (mem) hkpBridgeAtoms(); }}},
+      {"hkpConstraintChainData",
+       {0, 12,
+        [](void *mem)
+            -> void * { return new (mem) hkpConstraintChainData(); }}},
+      {"hkpBallSocketChainData",
+       {4294967295, 52,
+        [](void *mem)
+            -> void * { return new (mem) hkpBallSocketChainData(); }}},
+      {"hkpKeyframedRigidMotion",
+       {4294967295, 288,
+        [](void *mem)
+            -> void * { return new (mem) hkpKeyframedRigidMotion(); }}},
+      {"hkpMaxSizeMotion",
+       {4294967295, 288,
+        [](void *mem) -> void * { return new (mem) hkpMaxSizeMotion(); }}},
+      {"hkSweptTransform",
+       {0, 80,
+        [](void *mem) -> void * { return new (mem) hkSweptTransform(); }}},
+      {"hkMotionState",
+       {0, 176, [](void *mem) -> void * { return new (mem) hkMotionState(); }}},
+      {"hkpMotion",
+       {0, 288, [](void *mem) -> void * { return new (mem) hkpMotion(); }}},
+      {"hkpBoxMotion",
+       {4294967295, 288,
+        [](void *mem) -> void * { return new (mem) hkpBoxMotion(); }}},
+      {"hkpBreakableConstraintData",
+       {4294967295, 40,
+        [](void *mem)
+            -> void * { return new (mem) hkpBreakableConstraintData(); }}},
+      {"hkpShapePhantom",
+       {0, 352,
+        [](void *mem) -> void * { return new (mem) hkpShapePhantom(); }}},
+      {"hkpCachingShapePhantom",
+       {4294967295, 368,
+        [](void *mem)
+            -> void * { return new (mem) hkpCachingShapePhantom(); }}},
+      {"hkpConstraintMotor",
+       {0, 12,
+        [](void *mem) -> void * { return new (mem) hkpConstraintMotor(); }}},
+      {"hkpLimitedForceConstraintMotor",
+       {0, 20,
+        [](void *mem)
+            -> void * { return new (mem) hkpLimitedForceConstraintMotor(); }}},
+      {"hkpCallbackConstraintMotor",
+       {4294967295, 40,
+        [](void *mem)
+            -> void * { return new (mem) hkpCallbackConstraintMotor(); }}},
+      {"hkpCharacterMotion",
+       {4294967295, 288,
+        [](void *mem) -> void * { return new (mem) hkpCharacterMotion(); }}},
+      {"hkpSetLocalTransformsConstraintAtom",
+       {0, 144,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpSetLocalTransformsConstraintAtom();
+                          }}},
+      {"hkpCogWheelConstraintAtom",
+       {0, 16,
+        [](void *mem)
+            -> void * { return new (mem) hkpCogWheelConstraintAtom(); }}},
+      {"hkpCogWheelConstraintDataAtoms",
+       {0, 160,
+        [](void *mem)
+            -> void * { return new (mem) hkpCogWheelConstraintDataAtoms(); }}},
+      {"hkpCogWheelConstraintData",
+       {4294967295, 176,
+        [](void *mem)
+            -> void * { return new (mem) hkpCogWheelConstraintData(); }}},
+      {"hkpConstraintInstanceSmallArraySerializeOverrideType",
+       {0, 8,
+        [](void *mem)
+            -> void
+                * {
+                  return new (mem)
+                      hkpConstraintInstanceSmallArraySerializeOverrideType();
+                }}},
+      {"hkpModifierConstraintAtom",
+       {0, 32,
+        [](void *mem)
+            -> void * { return new (mem) hkpModifierConstraintAtom(); }}},
+      {"hkpConstraintInstance",
+       {4294967295, 56,
+        [](void *mem) -> void * { return new (mem) hkpConstraintInstance(); }}},
+      {"hkpEntitySpuCollisionCallback",
+       {0, 8,
+        [](void *mem)
+            -> void * { return new (mem) hkpEntitySpuCollisionCallback(); }}},
+      {"hkpEntitySmallArraySerializeOverrideType",
+       {0, 8,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpEntitySmallArraySerializeOverrideType();
+                          }}},
+      {"hkpEntityExtendedListeners",
+       {0, 16,
+        [](void *mem)
+            -> void * { return new (mem) hkpEntityExtendedListeners(); }}},
+      {"hkpMaterial",
+       {0, 12, [](void *mem) -> void * { return new (mem) hkpMaterial(); }}},
+      {"hkpEntity",
+       {4294967295, 544,
+        [](void *mem) -> void * { return new (mem) hkpEntity(); }}},
+      {"hkpAction",
+       {0, 24, [](void *mem) -> void * { return new (mem) hkpAction(); }}},
+      {"hkpConstraintChainInstanceAction",
+       {4294967295, 28,
+        [](void *mem) -> void
+                          * {
+                            return new (mem) hkpConstraintChainInstanceAction();
+                          }}},
+      {"hkpConstraintChainInstance",
+       {4294967295, 72,
+        [](void *mem)
+            -> void * { return new (mem) hkpConstraintChainInstance(); }}},
+      {"hkpPairCollisionFilterMapPairFilterKeyOverrideType",
+       {0, 12,
+        [](void *mem)
+            -> void
+                * {
+                  return new (mem)
+                      hkpPairCollisionFilterMapPairFilterKeyOverrideType();
+                }}},
+      {"hkpPairCollisionFilter",
+       {4294967295, 64,
+        [](void *mem)
+            -> void * { return new (mem) hkpPairCollisionFilter(); }}},
+      {"hkpConstraintCollisionFilter",
+       {4294967295, 68,
+        [](void *mem)
+            -> void * { return new (mem) hkpConstraintCollisionFilter(); }}},
+      {"hkWorldMemoryAvailableWatchDog",
+       {0, 8,
+        [](void *mem)
+            -> void * { return new (mem) hkWorldMemoryAvailableWatchDog(); }}},
+      {"hkpDefaultWorldMemoryWatchDog",
+       {4294967295, 12,
+        [](void *mem)
+            -> void * { return new (mem) hkpDefaultWorldMemoryWatchDog(); }}},
+      {"hkpFixedRigidMotion",
+       {4294967295, 288,
+        [](void *mem) -> void * { return new (mem) hkpFixedRigidMotion(); }}},
+      {"hkpGenericConstraintDataSchemeConstraintInfo",
+       {0, 16,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpGenericConstraintDataSchemeConstraintInfo();
+                          }}},
+      {"hkpGenericConstraintDataScheme",
+       {0, 64,
+        [](void *mem)
+            -> void * { return new (mem) hkpGenericConstraintDataScheme(); }}},
+      {"hkpGenericConstraintData",
+       {4294967295, 88,
+        [](void *mem)
+            -> void * { return new (mem) hkpGenericConstraintData(); }}},
+      {"hkp2dAngConstraintAtom",
+       {0, 4,
+        [](void *mem)
+            -> void * { return new (mem) hkp2dAngConstraintAtom(); }}},
+      {"hkpHingeConstraintDataAtoms",
+       {0, 192,
+        [](void *mem)
+            -> void * { return new (mem) hkpHingeConstraintDataAtoms(); }}},
+      {"hkpHingeConstraintData",
+       {4294967295, 208,
+        [](void *mem)
+            -> void * { return new (mem) hkpHingeConstraintData(); }}},
+      {"hkpSetLocalRotationsConstraintAtom",
+       {0, 112,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpSetLocalRotationsConstraintAtom();
+                          }}},
+      {"hkpAngLimitConstraintAtom",
+       {0, 16,
+        [](void *mem)
+            -> void * { return new (mem) hkpAngLimitConstraintAtom(); }}},
+      {"hkpHingeLimitsDataAtoms",
+       {0, 144,
+        [](void *mem)
+            -> void * { return new (mem) hkpHingeLimitsDataAtoms(); }}},
+      {"hkpHingeLimitsData",
+       {4294967295, 160,
+        [](void *mem) -> void * { return new (mem) hkpHingeLimitsData(); }}},
+      {"hkpAngMotorConstraintAtom",
+       {0, 20,
+        [](void *mem)
+            -> void * { return new (mem) hkpAngMotorConstraintAtom(); }}},
+      {"hkpAngFrictionConstraintAtom",
+       {0, 12,
+        [](void *mem)
+            -> void * { return new (mem) hkpAngFrictionConstraintAtom(); }}},
+      {"hkpLimitedHingeConstraintDataAtoms",
+       {0, 240,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpLimitedHingeConstraintDataAtoms();
+                          }}},
+      {"hkpLimitedHingeConstraintData",
+       {4294967295, 256,
+        [](void *mem)
+            -> void * { return new (mem) hkpLimitedHingeConstraintData(); }}},
+      {"hkpParametricCurve",
+       {0, 8,
+        [](void *mem) -> void * { return new (mem) hkpParametricCurve(); }}},
+      {"hkpLinearParametricCurve",
+       {4294967295, 64,
+        [](void *mem)
+            -> void * { return new (mem) hkpLinearParametricCurve(); }}},
+      {"hkpMalleableConstraintData",
+       {4294967295, 32,
+        [](void *mem)
+            -> void * { return new (mem) hkpMalleableConstraintData(); }}},
+      {"hkpRigidBody",
+       {4294967295, 544,
+        [](void *mem) -> void * { return new (mem) hkpRigidBody(); }}},
+      {"hkpPhysicsSystem",
+       {4294967295, 68,
+        [](void *mem) -> void * { return new (mem) hkpPhysicsSystem(); }}},
+      {"hkpPointToPathConstraintData",
+       {4294967295, 176,
+        [](void *mem)
+            -> void * { return new (mem) hkpPointToPathConstraintData(); }}},
+      {"hkpLinConstraintAtom",
+       {0, 4,
+        [](void *mem) -> void * { return new (mem) hkpLinConstraintAtom(); }}},
+      {"hkpPointToPlaneConstraintDataAtoms",
+       {0, 160,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpPointToPlaneConstraintDataAtoms();
+                          }}},
+      {"hkpPointToPlaneConstraintData",
+       {4294967295, 176,
+        [](void *mem)
+            -> void * { return new (mem) hkpPointToPlaneConstraintData(); }}},
+      {"hkpPositionConstraintMotor",
+       {4294967295, 36,
+        [](void *mem)
+            -> void * { return new (mem) hkpPositionConstraintMotor(); }}},
+      {"hkpAngConstraintAtom",
+       {0, 4,
+        [](void *mem) -> void * { return new (mem) hkpAngConstraintAtom(); }}},
+      {"hkpLinFrictionConstraintAtom",
+       {0, 8,
+        [](void *mem)
+            -> void * { return new (mem) hkpLinFrictionConstraintAtom(); }}},
+      {"hkpLinMotorConstraintAtom",
+       {0, 16,
+        [](void *mem)
+            -> void * { return new (mem) hkpLinMotorConstraintAtom(); }}},
+      {"hkpLinLimitConstraintAtom",
+       {0, 12,
+        [](void *mem)
+            -> void * { return new (mem) hkpLinLimitConstraintAtom(); }}},
+      {"hkpPrismaticConstraintDataAtoms",
+       {0, 192,
+        [](void *mem)
+            -> void * { return new (mem) hkpPrismaticConstraintDataAtoms(); }}},
+      {"hkpPrismaticConstraintData",
+       {4294967295, 208,
+        [](void *mem)
+            -> void * { return new (mem) hkpPrismaticConstraintData(); }}},
+      {"hkpPulleyConstraintAtom",
+       {0, 64,
+        [](void *mem)
+            -> void * { return new (mem) hkpPulleyConstraintAtom(); }}},
+      {"hkpPulleyConstraintDataAtoms",
+       {0, 112,
+        [](void *mem)
+            -> void * { return new (mem) hkpPulleyConstraintDataAtoms(); }}},
+      {"hkpPulleyConstraintData",
+       {4294967295, 128,
+        [](void *mem)
+            -> void * { return new (mem) hkpPulleyConstraintData(); }}},
+      {"hkpRackAndPinionConstraintAtom",
+       {0, 12,
+        [](void *mem)
+            -> void * { return new (mem) hkpRackAndPinionConstraintAtom(); }}},
+      {"hkpRackAndPinionConstraintDataAtoms",
+       {0, 160,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpRackAndPinionConstraintDataAtoms();
+                          }}},
+      {"hkpRackAndPinionConstraintData",
+       {4294967295, 176,
+        [](void *mem)
+            -> void * { return new (mem) hkpRackAndPinionConstraintData(); }}},
+      {"hkpConeLimitConstraintAtom",
+       {0, 20,
+        [](void *mem)
+            -> void * { return new (mem) hkpConeLimitConstraintAtom(); }}},
+      {"hkpRagdollMotorConstraintAtom",
+       {0, 80,
+        [](void *mem)
+            -> void * { return new (mem) hkpRagdollMotorConstraintAtom(); }}},
+      {"hkpTwistLimitConstraintAtom",
+       {0, 20,
+        [](void *mem)
+            -> void * { return new (mem) hkpTwistLimitConstraintAtom(); }}},
+      {"hkpRagdollConstraintDataAtoms",
+       {0, 336,
+        [](void *mem)
+            -> void * { return new (mem) hkpRagdollConstraintDataAtoms(); }}},
+      {"hkpRagdollConstraintData",
+       {4294967295, 352,
+        [](void *mem)
+            -> void * { return new (mem) hkpRagdollConstraintData(); }}},
+      {"hkpRagdollLimitsDataAtoms",
+       {0, 176,
+        [](void *mem)
+            -> void * { return new (mem) hkpRagdollLimitsDataAtoms(); }}},
+      {"hkpRagdollLimitsData",
+       {4294967295, 192,
+        [](void *mem) -> void * { return new (mem) hkpRagdollLimitsData(); }}},
+      {"hkpRotationalConstraintDataAtoms",
+       {0, 128,
+        [](void *mem) -> void
+                          * {
+                            return new (mem) hkpRotationalConstraintDataAtoms();
+                          }}},
+      {"hkpRotationalConstraintData",
+       {4294967295, 144,
+        [](void *mem)
+            -> void * { return new (mem) hkpRotationalConstraintData(); }}},
+      {"hkpSimpleShapePhantomCollisionDetail",
+       {0, 4,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpSimpleShapePhantomCollisionDetail();
+                          }}},
+      {"hkpSimpleShapePhantom",
+       {4294967295, 368,
+        [](void *mem) -> void * { return new (mem) hkpSimpleShapePhantom(); }}},
+      {"hkpWorld",
+       {4294967295, 864,
+        [](void *mem) -> void * { return new (mem) hkpWorld(); }}},
+      {"hkpSimulation",
+       {4294967295, 44,
+        [](void *mem) -> void * { return new (mem) hkpSimulation(); }}},
+      {"hkpSphereMotion",
+       {4294967295, 288,
+        [](void *mem) -> void * { return new (mem) hkpSphereMotion(); }}},
+      {"hkpSpringDamperConstraintMotor",
+       {4294967295, 28,
+        [](void *mem)
+            -> void * { return new (mem) hkpSpringDamperConstraintMotor(); }}},
+      {"hkpStiffSpringChainDataConstraintInfo",
+       {0, 48,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpStiffSpringChainDataConstraintInfo();
+                          }}},
+      {"hkpStiffSpringChainData",
+       {4294967295, 48,
+        [](void *mem)
+            -> void * { return new (mem) hkpStiffSpringChainData(); }}},
+      {"hkpStiffSpringConstraintAtom",
+       {0, 8,
+        [](void *mem)
+            -> void * { return new (mem) hkpStiffSpringConstraintAtom(); }}},
+      {"hkpStiffSpringConstraintDataAtoms",
+       {0, 64,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpStiffSpringConstraintDataAtoms();
+                          }}},
+      {"hkpStiffSpringConstraintData",
+       {4294967295, 80,
+        [](void *mem)
+            -> void * { return new (mem) hkpStiffSpringConstraintData(); }}},
+      {"hkpThinBoxMotion",
+       {4294967295, 288,
+        [](void *mem) -> void * { return new (mem) hkpThinBoxMotion(); }}},
+      {"hkpVelocityConstraintMotor",
+       {4294967295, 32,
+        [](void *mem)
+            -> void * { return new (mem) hkpVelocityConstraintMotor(); }}},
+      {"hkpLinSoftConstraintAtom",
+       {0, 12,
+        [](void *mem)
+            -> void * { return new (mem) hkpLinSoftConstraintAtom(); }}},
+      {"hkpWheelConstraintDataAtoms",
+       {0, 304,
+        [](void *mem)
+            -> void * { return new (mem) hkpWheelConstraintDataAtoms(); }}},
+      {"hkpWheelConstraintData",
+       {4294967295, 352,
+        [](void *mem)
+            -> void * { return new (mem) hkpWheelConstraintData(); }}},
+      {"hkpWorldCinfo",
+       {4294967295, 240,
+        [](void *mem) -> void * { return new (mem) hkpWorldCinfo(); }}},
+      {"hkpPoweredChainDataConstraintInfo",
+       {0, 80,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpPoweredChainDataConstraintInfo();
+                          }}},
+      {"hkpPoweredChainData",
+       {4294967295, 64,
+        [](void *mem) -> void * { return new (mem) hkpPoweredChainData(); }}},
+      {"hkpBinaryAction",
+       {0, 32,
+        [](void *mem) -> void * { return new (mem) hkpBinaryAction(); }}},
+      {"hkpAngularDashpotAction",
+       {4294967295, 64,
+        [](void *mem)
+            -> void * { return new (mem) hkpAngularDashpotAction(); }}},
+      {"hkpFirstPersonGun",
+       {4294967295, 32,
+        [](void *mem) -> void * { return new (mem) hkpFirstPersonGun(); }}},
+      {"hkpBallGun",
+       {4294967295, 96,
+        [](void *mem) -> void * { return new (mem) hkpBallGun(); }}},
+      {"hkpCharacterControllerCinfo",
+       {4294967295, 8,
+        [](void *mem)
+            -> void * { return new (mem) hkpCharacterControllerCinfo(); }}},
+      {"hkpCharacterProxyCinfo",
+       {4294967295, 144,
+        [](void *mem)
+            -> void * { return new (mem) hkpCharacterProxyCinfo(); }}},
+      {"hkpCharacterRigidBodyCinfo",
+       {4294967295, 112,
+        [](void *mem)
+            -> void * { return new (mem) hkpCharacterRigidBodyCinfo(); }}},
+      {"hkpConstrainedSystemFilter",
+       {4294967295, 56,
+        [](void *mem)
+            -> void * { return new (mem) hkpConstrainedSystemFilter(); }}},
+      {"hkpDashpotAction",
+       {4294967295, 96,
+        [](void *mem) -> void * { return new (mem) hkpDashpotAction(); }}},
+      {"hkpDisableEntityCollisionFilter",
+       {4294967295, 64,
+        [](void *mem)
+            -> void * { return new (mem) hkpDisableEntityCollisionFilter(); }}},
+      {"hkpDisplayBindingDataRigidBody",
+       {4294967295, 80,
+        [](void *mem)
+            -> void * { return new (mem) hkpDisplayBindingDataRigidBody(); }}},
+      {"hkpDisplayBindingDataPhysicsSystem",
+       {4294967295, 24,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpDisplayBindingDataPhysicsSystem();
+                          }}},
+      {"hkpDisplayBindingData",
+       {4294967295, 32,
+        [](void *mem) -> void * { return new (mem) hkpDisplayBindingData(); }}},
+      {"hkpGravityGun",
+       {4294967295, 96,
+        [](void *mem) -> void * { return new (mem) hkpGravityGun(); }}},
+      {"hkpGroupCollisionFilter",
+       {4294967295, 180,
+        [](void *mem)
+            -> void * { return new (mem) hkpGroupCollisionFilter(); }}},
+      {"hkpUnaryAction",
+       {0, 28, [](void *mem) -> void * { return new (mem) hkpUnaryAction(); }}},
+      {"hkpMotorAction",
+       {4294967295, 64,
+        [](void *mem) -> void * { return new (mem) hkpMotorAction(); }}},
+      {"hkpMountedBallGun",
+       {4294967295, 112,
+        [](void *mem) -> void * { return new (mem) hkpMountedBallGun(); }}},
+      {"hkpMouseSpringAction",
+       {4294967295, 96,
+        [](void *mem) -> void * { return new (mem) hkpMouseSpringAction(); }}},
+      {"hkpPhysicsData",
+       {4294967295, 24,
+        [](void *mem) -> void * { return new (mem) hkpPhysicsData(); }}},
+      {"hkpSimpleContactConstraintDataInfo",
+       {0, 32,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpSimpleContactConstraintDataInfo();
+                          }}},
+      {"hkpSimpleContactConstraintAtom",
+       {0, 48,
+        [](void *mem)
+            -> void * { return new (mem) hkpSimpleContactConstraintAtom(); }}},
+      {"hkContactPoint",
+       {0, 32, [](void *mem) -> void * { return new (mem) hkContactPoint(); }}},
+      {"hkpAgent1nSector",
+       {0, 512,
+        [](void *mem) -> void * { return new (mem) hkpAgent1nSector(); }}},
+      {"hkpSerializedSubTrack1nInfo",
+       {0, 32,
+        [](void *mem)
+            -> void * { return new (mem) hkpSerializedSubTrack1nInfo(); }}},
+      {"hkpSerializedTrack1nInfo",
+       {0, 24,
+        [](void *mem)
+            -> void * { return new (mem) hkpSerializedTrack1nInfo(); }}},
+      {"hkpSerializedAgentNnEntry",
+       {4294967295, 320,
+        [](void *mem)
+            -> void * { return new (mem) hkpSerializedAgentNnEntry(); }}},
+      {"hkpPhysicsSystemWithContacts",
+       {4294967295, 80,
+        [](void *mem)
+            -> void * { return new (mem) hkpPhysicsSystemWithContacts(); }}},
+      {"hkpPoweredChainMapperTarget",
+       {0, 8,
+        [](void *mem)
+            -> void * { return new (mem) hkpPoweredChainMapperTarget(); }}},
+      {"hkpPoweredChainMapperLinkInfo",
+       {0, 12,
+        [](void *mem)
+            -> void * { return new (mem) hkpPoweredChainMapperLinkInfo(); }}},
+      {"hkpPoweredChainMapper",
+       {4294967295, 44,
+        [](void *mem) -> void * { return new (mem) hkpPoweredChainMapper(); }}},
+      {"hkpProjectileGun",
+       {4294967295, 64,
+        [](void *mem) -> void * { return new (mem) hkpProjectileGun(); }}},
+      {"hkpReorientAction",
+       {4294967295, 80,
+        [](void *mem) -> void * { return new (mem) hkpReorientAction(); }}},
+      {"hkpSerializedDisplayMarker",
+       {4294967295, 80,
+        [](void *mem)
+            -> void * { return new (mem) hkpSerializedDisplayMarker(); }}},
+      {"hkpSerializedDisplayMarkerList",
+       {4294967295, 20,
+        [](void *mem)
+            -> void * { return new (mem) hkpSerializedDisplayMarkerList(); }}},
+      {"hkpSerializedDisplayRbTransformsDisplayTransformPair",
+       {0, 80,
+        [](void *mem)
+            -> void
+                * {
+                  return new (mem)
+                      hkpSerializedDisplayRbTransformsDisplayTransformPair();
+                }}},
+      {"hkpSerializedDisplayRbTransforms",
+       {4294967295, 20,
+        [](void *mem) -> void
+                          * {
+                            return new (mem) hkpSerializedDisplayRbTransforms();
+                          }}},
+      {"hkpSpringAction",
+       {4294967295, 96,
+        [](void *mem) -> void * { return new (mem) hkpSpringAction(); }}},
+      {"hkpTriggerVolumeEventInfo",
+       {0, 16,
+        [](void *mem)
+            -> void * { return new (mem) hkpTriggerVolumeEventInfo(); }}},
+      {"hkpTriggerVolume",
+       {4294967295, 52,
+        [](void *mem) -> void * { return new (mem) hkpTriggerVolume(); }}},
+      {"hkaAnnotationTrackAnnotation",
+       {0, 8,
+        [](void *mem)
+            -> void * { return new (mem) hkaAnnotationTrackAnnotation(); }}},
+      {"hkaAnnotationTrack",
+       {0, 16,
+        [](void *mem) -> void * { return new (mem) hkaAnnotationTrack(); }}},
+      {"hkaAnimatedReferenceFrame",
+       {0, 8,
+        [](void *mem)
+            -> void * { return new (mem) hkaAnimatedReferenceFrame(); }}},
+      {"hkaAnimation",
+       {0, 40, [](void *mem) -> void * { return new (mem) hkaAnimation(); }}},
+      {"hkaAnimationBinding",
+       {4294967295, 44,
+        [](void *mem) -> void * { return new (mem) hkaAnimationBinding(); }}},
+      {"hkaBoneAttachment",
+       {4294967295, 96,
+        [](void *mem) -> void * { return new (mem) hkaBoneAttachment(); }}},
+      {"hkaSkeletonLocalFrameOnBone",
+       {0, 8,
+        [](void *mem)
+            -> void * { return new (mem) hkaSkeletonLocalFrameOnBone(); }}},
+      {"hkaBone",
+       {0, 8, [](void *mem) -> void * { return new (mem) hkaBone(); }}},
+      {"hkaSkeleton",
+       {4294967295, 84,
+        [](void *mem) -> void * { return new (mem) hkaSkeleton(); }}},
+      {"hkaMeshBindingMapping",
+       {0, 12,
+        [](void *mem) -> void * { return new (mem) hkaMeshBindingMapping(); }}},
+      {"hkaMeshBinding",
+       {4294967295, 44,
+        [](void *mem) -> void * { return new (mem) hkaMeshBinding(); }}},
+      {"hkaAnimationContainer",
+       {4294967295, 68,
+        [](void *mem) -> void * { return new (mem) hkaAnimationContainer(); }}},
+      {"hkaAnimationPreviewColorContainer",
+       {4294967295, 20,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkaAnimationPreviewColorContainer();
+                          }}},
+      {"hkaDefaultAnimatedReferenceFrame",
+       {4294967295, 64,
+        [](void *mem) -> void
+                          * {
+                            return new (mem) hkaDefaultAnimatedReferenceFrame();
+                          }}},
+      {"hkaDeltaCompressedAnimationQuantizationFormat",
+       {0, 20,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkaDeltaCompressedAnimationQuantizationFormat();
+                          }}},
+      {"hkaDeltaCompressedAnimation",
+       {4294967295, 120,
+        [](void *mem)
+            -> void * { return new (mem) hkaDeltaCompressedAnimation(); }}},
+      {"hkaFootstepAnalysisInfo",
+       {4294967295, 152,
+        [](void *mem)
+            -> void * { return new (mem) hkaFootstepAnalysisInfo(); }}},
+      {"hkaFootstepAnalysisInfoContainer",
+       {4294967295, 20,
+        [](void *mem) -> void
+                          * {
+                            return new (mem) hkaFootstepAnalysisInfoContainer();
+                          }}},
+      {"hkaInterleavedUncompressedAnimation",
+       {4294967295, 64,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkaInterleavedUncompressedAnimation();
+                          }}},
+      {"hkaQuantizedAnimation",
+       {4294967295, 60,
+        [](void *mem) -> void * { return new (mem) hkaQuantizedAnimation(); }}},
+      {"hkaSkeletonMapperDataSimpleMapping",
+       {0, 64,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkaSkeletonMapperDataSimpleMapping();
+                          }}},
+      {"hkaSkeletonMapperDataChainMapping",
+       {0, 112,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkaSkeletonMapperDataChainMapping();
+                          }}},
+      {"hkaSkeletonMapperData",
+       {0, 112,
+        [](void *mem) -> void * { return new (mem) hkaSkeletonMapperData(); }}},
+      {"hkaSkeletonMapper",
+       {4294967295, 128,
+        [](void *mem) -> void * { return new (mem) hkaSkeletonMapper(); }}},
+      {"hkaSplineCompressedAnimation",
+       {4294967295, 132,
+        [](void *mem)
+            -> void * { return new (mem) hkaSplineCompressedAnimation(); }}},
+      {"hkaWaveletCompressedAnimationQuantizationFormat",
+       {0, 20,
+        [](void *mem)
+            -> void
+                * {
+                  return new (mem)
+                      hkaWaveletCompressedAnimationQuantizationFormat();
+                }}},
+      {"hkaWaveletCompressedAnimation",
+       {4294967295, 112,
+        [](void *mem)
+            -> void * { return new (mem) hkaWaveletCompressedAnimation(); }}},
+      {"hkaRagdollInstance",
+       {4294967295, 48,
+        [](void *mem) -> void * { return new (mem) hkaRagdollInstance(); }}},
+      {"hkbEventInfo",
+       {0, 4, [](void *mem) -> void * { return new (mem) hkbEventInfo(); }}},
+      {"hkbVariableValue",
+       {0, 4,
+        [](void *mem) -> void * { return new (mem) hkbVariableValue(); }}},
+      {"hkbVariableValueSet",
+       {4294967295, 44,
+        [](void *mem) -> void * { return new (mem) hkbVariableValueSet(); }}},
+      {"hkbRoleAttribute",
+       {0, 4,
+        [](void *mem) -> void * { return new (mem) hkbRoleAttribute(); }}},
+      {"hkbVariableInfo",
+       {0, 6, [](void *mem) -> void * { return new (mem) hkbVariableInfo(); }}},
+      {"hkbBehaviorGraphStringData",
+       {4294967295, 56,
+        [](void *mem)
+            -> void * { return new (mem) hkbBehaviorGraphStringData(); }}},
+      {"hkbBehaviorGraphData",
+       {4294967295, 88,
+        [](void *mem) -> void * { return new (mem) hkbBehaviorGraphData(); }}},
+      {"hkbVariableBindingSetBinding",
+       {0, 32,
+        [](void *mem)
+            -> void * { return new (mem) hkbVariableBindingSetBinding(); }}},
+      {"hkbVariableBindingSet",
+       {4294967295, 28,
+        [](void *mem) -> void * { return new (mem) hkbVariableBindingSet(); }}},
+      {"hkbBindable",
+       {4294967295, 28,
+        [](void *mem) -> void * { return new (mem) hkbBindable(); }}},
+      {"hkbNode",
+       {4294967295, 40,
+        [](void *mem) -> void * { return new (mem) hkbNode(); }}},
+      {"hkbGenerator",
+       {0, 40, [](void *mem) -> void * { return new (mem) hkbGenerator(); }}},
+      {"hkbBehaviorGraph",
+       {4294967295, 176,
+        [](void *mem) -> void * { return new (mem) hkbBehaviorGraph(); }}},
+      {"hkbMirroredSkeletonInfo",
+       {4294967295, 48,
+        [](void *mem)
+            -> void * { return new (mem) hkbMirroredSkeletonInfo(); }}},
+      {"hkbHandIkDriverInfoHand",
+       {0, 96,
+        [](void *mem)
+            -> void * { return new (mem) hkbHandIkDriverInfoHand(); }}},
+      {"hkbHandIkDriverInfo",
+       {4294967295, 24,
+        [](void *mem) -> void * { return new (mem) hkbHandIkDriverInfo(); }}},
+      {"hkbCharacterDataCharacterControllerInfo",
+       {0, 16,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbCharacterDataCharacterControllerInfo();
+                          }}},
+      {"hkbCharacterStringData",
+       {4294967295, 132,
+        [](void *mem)
+            -> void * { return new (mem) hkbCharacterStringData(); }}},
+      {"hkbFootIkDriverInfoLeg",
+       {0, 96,
+        [](void *mem)
+            -> void * { return new (mem) hkbFootIkDriverInfoLeg(); }}},
+      {"hkbFootIkDriverInfo",
+       {4294967295, 56,
+        [](void *mem) -> void * { return new (mem) hkbFootIkDriverInfo(); }}},
+      {"hkbCharacterData",
+       {4294967295, 144,
+        [](void *mem) -> void * { return new (mem) hkbCharacterData(); }}},
+      {"hkbCharacterSetup",
+       {4294967295, 48,
+        [](void *mem) -> void * { return new (mem) hkbCharacterSetup(); }}},
+      {"hkbProjectStringData",
+       {4294967295, 76,
+        [](void *mem) -> void * { return new (mem) hkbProjectStringData(); }}},
+      {"hkbProjectData",
+       {4294967295, 48,
+        [](void *mem) -> void * { return new (mem) hkbProjectData(); }}},
+      {"hkbCharacter",
+       {4294967295, 88,
+        [](void *mem) -> void * { return new (mem) hkbCharacter(); }}},
+      {"hkbHandle",
+       {4294967295, 24,
+        [](void *mem) -> void * { return new (mem) hkbHandle(); }}},
+      {"hkbEventPayload",
+       {4294967295, 8,
+        [](void *mem) -> void * { return new (mem) hkbEventPayload(); }}},
+      {"hkbEventBase",
+       {0, 8, [](void *mem) -> void * { return new (mem) hkbEventBase(); }}},
+      {"hkbEventProperty",
+       {0, 8,
+        [](void *mem) -> void * { return new (mem) hkbEventProperty(); }}},
+      {"hkbAttachmentSetup",
+       {4294967295, 40,
+        [](void *mem) -> void * { return new (mem) hkbAttachmentSetup(); }}},
+      {"hkbModifier",
+       {4294967295, 44,
+        [](void *mem) -> void * { return new (mem) hkbModifier(); }}},
+      {"hkbAttachmentModifier",
+       {4294967295, 108,
+        [](void *mem) -> void * { return new (mem) hkbAttachmentModifier(); }}},
+      {"hkbAttributeModifierAssignment",
+       {0, 8,
+        [](void *mem)
+            -> void * { return new (mem) hkbAttributeModifierAssignment(); }}},
+      {"hkbAttributeModifier",
+       {4294967295, 56,
+        [](void *mem) -> void * { return new (mem) hkbAttributeModifier(); }}},
+      {"hkbGeneratorSyncInfoSyncPoint",
+       {0, 8,
+        [](void *mem)
+            -> void * { return new (mem) hkbGeneratorSyncInfoSyncPoint(); }}},
+      {"hkbGeneratorSyncInfo",
+       {0, 80,
+        [](void *mem) -> void * { return new (mem) hkbGeneratorSyncInfo(); }}},
+      {"hkbNodeInternalStateInfo",
+       {4294967295, 100,
+        [](void *mem)
+            -> void * { return new (mem) hkbNodeInternalStateInfo(); }}},
+      {"hkbBehaviorGraphInternalState",
+       {4294967295, 24,
+        [](void *mem)
+            -> void * { return new (mem) hkbBehaviorGraphInternalState(); }}},
+      {"hkbBehaviorReferenceGenerator",
+       {4294967295, 48,
+        [](void *mem)
+            -> void * { return new (mem) hkbBehaviorReferenceGenerator(); }}},
+      {"hkbBoneWeightArray",
+       {4294967295, 40,
+        [](void *mem) -> void * { return new (mem) hkbBoneWeightArray(); }}},
+      {"hkbBlenderGeneratorChild",
+       {4294967295, 48,
+        [](void *mem)
+            -> void * { return new (mem) hkbBlenderGeneratorChild(); }}},
+      {"hkbBlenderGenerator",
+       {4294967295, 116,
+        [](void *mem) -> void * { return new (mem) hkbBlenderGenerator(); }}},
+      {"hkbBlenderGeneratorChildInternalState",
+       {0, 2,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbBlenderGeneratorChildInternalState();
+                          }}},
+      {"hkbBlenderGeneratorInternalState",
+       {4294967295, 48,
+        [](void *mem) -> void
+                          * {
+                            return new (mem) hkbBlenderGeneratorInternalState();
+                          }}},
+      {"hkbTransitionEffect",
+       {0, 44,
+        [](void *mem) -> void * { return new (mem) hkbTransitionEffect(); }}},
+      {"hkbBlendingTransitionEffect",
+       {4294967295, 88,
+        [](void *mem)
+            -> void * { return new (mem) hkbBlendingTransitionEffect(); }}},
+      {"hkbBlendingTransitionEffectInternalState",
+       {4294967295, 32,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbBlendingTransitionEffectInternalState();
+                          }}},
+      {"hkbBoneIndexArray",
+       {4294967295, 40,
+        [](void *mem) -> void * { return new (mem) hkbBoneIndexArray(); }}},
+      {"hkbBoolVariableSequencedDataSample",
+       {0, 8,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbBoolVariableSequencedDataSample();
+                          }}},
+      {"hkbSequencedData",
+       {0, 8,
+        [](void *mem) -> void * { return new (mem) hkbSequencedData(); }}},
+      {"hkbBoolVariableSequencedData",
+       {4294967295, 24,
+        [](void *mem)
+            -> void * { return new (mem) hkbBoolVariableSequencedData(); }}},
+      {"hkbCharacterControllerControlData",
+       {0, 32,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbCharacterControllerControlData();
+                          }}},
+      {"hkbCharacterControllerModifier",
+       {4294967295, 144,
+        [](void *mem)
+            -> void * { return new (mem) hkbCharacterControllerModifier(); }}},
+      {"hkbCharacterControllerModifierInternalState",
+       {4294967295, 48,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbCharacterControllerModifierInternalState();
+                          }}},
+      {"hkbClipTrigger",
+       {0, 16, [](void *mem) -> void * { return new (mem) hkbClipTrigger(); }}},
+      {"hkbClipTriggerArray",
+       {4294967295, 20,
+        [](void *mem) -> void * { return new (mem) hkbClipTriggerArray(); }}},
+      {"hkbClipGenerator",
+       {4294967295, 208,
+        [](void *mem) -> void * { return new (mem) hkbClipGenerator(); }}},
+      {"hkbClipGeneratorEcho",
+       {0, 16,
+        [](void *mem) -> void * { return new (mem) hkbClipGeneratorEcho(); }}},
+      {"hkbClipGeneratorInternalState",
+       {4294967295, 112,
+        [](void *mem)
+            -> void * { return new (mem) hkbClipGeneratorInternalState(); }}},
+      {"hkbCombineTransformsModifier",
+       {4294967295, 160,
+        [](void *mem)
+            -> void * { return new (mem) hkbCombineTransformsModifier(); }}},
+      {"hkbCombineTransformsModifierInternalState",
+       {4294967295, 48,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbCombineTransformsModifierInternalState();
+                          }}},
+      {"hkbCompiledExpressionSetToken",
+       {0, 8,
+        [](void *mem)
+            -> void * { return new (mem) hkbCompiledExpressionSetToken(); }}},
+      {"hkbCompiledExpressionSet",
+       {4294967295, 36,
+        [](void *mem)
+            -> void * { return new (mem) hkbCompiledExpressionSet(); }}},
+      {"hkbComputeDirectionModifier",
+       {4294967295, 112,
+        [](void *mem)
+            -> void * { return new (mem) hkbComputeDirectionModifier(); }}},
+      {"hkbComputeDirectionModifierInternalState",
+       {4294967295, 48,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbComputeDirectionModifierInternalState();
+                          }}},
+      {"hkbComputeRotationFromAxisAngleModifier",
+       {4294967295, 96,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbComputeRotationFromAxisAngleModifier();
+                          }}},
+      {"hkbComputeRotationFromAxisAngleModifierInternalState",
+       {4294967295, 32,
+        [](void *mem)
+            -> void
+                * {
+                  return new (mem)
+                      hkbComputeRotationFromAxisAngleModifierInternalState();
+                }}},
+      {"hkbComputeRotationToTargetModifier",
+       {4294967295, 160,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbComputeRotationToTargetModifier();
+                          }}},
+      {"hkbComputeRotationToTargetModifierInternalState",
+       {4294967295, 32,
+        [](void *mem)
+            -> void
+                * {
+                  return new (mem)
+                      hkbComputeRotationToTargetModifierInternalState();
+                }}},
+      {"hkbDampingModifier",
+       {4294967295, 160,
+        [](void *mem) -> void * { return new (mem) hkbDampingModifier(); }}},
+      {"hkbDampingModifierInternalState",
+       {4294967295, 80,
+        [](void *mem)
+            -> void * { return new (mem) hkbDampingModifierInternalState(); }}},
+      {"hkbModifierWrapper",
+       {4294967295, 48,
+        [](void *mem) -> void * { return new (mem) hkbModifierWrapper(); }}},
+      {"hkbDelayedModifier",
+       {4294967295, 64,
+        [](void *mem) -> void * { return new (mem) hkbDelayedModifier(); }}},
+      {"hkbDelayedModifierInternalState",
+       {4294967295, 16,
+        [](void *mem)
+            -> void * { return new (mem) hkbDelayedModifierInternalState(); }}},
+      {"hkbDetectCloseToGroundModifier",
+       {4294967295, 72,
+        [](void *mem)
+            -> void * { return new (mem) hkbDetectCloseToGroundModifier(); }}},
+      {"hkbDetectCloseToGroundModifierInternalState",
+       {4294967295, 12,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbDetectCloseToGroundModifierInternalState();
+                          }}},
+      {"hkbExpressionData",
+       {0, 16,
+        [](void *mem) -> void * { return new (mem) hkbExpressionData(); }}},
+      {"hkbExpressionDataArray",
+       {4294967295, 20,
+        [](void *mem)
+            -> void * { return new (mem) hkbExpressionDataArray(); }}},
+      {"hkbEvaluateExpressionModifier",
+       {4294967295, 64,
+        [](void *mem)
+            -> void * { return new (mem) hkbEvaluateExpressionModifier(); }}},
+      {"hkbEvaluateExpressionModifierInternalExpressionData",
+       {0, 2,
+        [](void *mem)
+            -> void
+                * {
+                  return new (mem)
+                      hkbEvaluateExpressionModifierInternalExpressionData();
+                }}},
+      {"hkbEvaluateExpressionModifierInternalState",
+       {4294967295, 20,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbEvaluateExpressionModifierInternalState();
+                          }}},
+      {"hkbEvaluateHandleModifier",
+       {4294967295, 176,
+        [](void *mem)
+            -> void * { return new (mem) hkbEvaluateHandleModifier(); }}},
+      {"hkbEventDrivenModifier",
+       {4294967295, 60,
+        [](void *mem)
+            -> void * { return new (mem) hkbEventDrivenModifier(); }}},
+      {"hkbEventDrivenModifierInternalState",
+       {4294967295, 12,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbEventDrivenModifierInternalState();
+                          }}},
+      {"hkbEventPayloadList",
+       {4294967295, 20,
+        [](void *mem) -> void * { return new (mem) hkbEventPayloadList(); }}},
+      {"hkbEventRangeData",
+       {0, 16,
+        [](void *mem) -> void * { return new (mem) hkbEventRangeData(); }}},
+      {"hkbEventRangeDataArray",
+       {4294967295, 20,
+        [](void *mem)
+            -> void * { return new (mem) hkbEventRangeDataArray(); }}},
+      {"hkbEvent",
+       {0, 12, [](void *mem) -> void * { return new (mem) hkbEvent(); }}},
+      {"hkbEventSequencedDataSequencedEvent",
+       {0, 16,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbEventSequencedDataSequencedEvent();
+                          }}},
+      {"hkbEventSequencedData",
+       {4294967295, 20,
+        [](void *mem) -> void * { return new (mem) hkbEventSequencedData(); }}},
+      {"hkbEventsFromRangeModifier",
+       {4294967295, 68,
+        [](void *mem)
+            -> void * { return new (mem) hkbEventsFromRangeModifier(); }}},
+      {"hkbEventsFromRangeModifierInternalState",
+       {4294967295, 20,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbEventsFromRangeModifierInternalState();
+                          }}},
+      {"hkbCondition",
+       {0, 8, [](void *mem) -> void * { return new (mem) hkbCondition(); }}},
+      {"hkbExpressionCondition",
+       {4294967295, 16,
+        [](void *mem)
+            -> void * { return new (mem) hkbExpressionCondition(); }}},
+      {"hkbExtractRagdollPoseModifier",
+       {4294967295, 52,
+        [](void *mem)
+            -> void * { return new (mem) hkbExtractRagdollPoseModifier(); }}},
+      {"hkbExtrapolatingTransitionEffect",
+       {4294967295, 304,
+        [](void *mem) -> void
+                          * {
+                            return new (mem) hkbExtrapolatingTransitionEffect();
+                          }}},
+      {"hkbExtrapolatingTransitionEffectInternalState",
+       {4294967295, 224,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbExtrapolatingTransitionEffectInternalState();
+                          }}},
+      {"hkbFootIkGains",
+       {0, 48, [](void *mem) -> void * { return new (mem) hkbFootIkGains(); }}},
+      {"hkbFootIkControlData",
+       {0, 48,
+        [](void *mem) -> void * { return new (mem) hkbFootIkControlData(); }}},
+      {"hkbFootIkControlsModifierLeg",
+       {0, 32,
+        [](void *mem)
+            -> void * { return new (mem) hkbFootIkControlsModifierLeg(); }}},
+      {"hkbFootIkControlsModifier",
+       {4294967295, 144,
+        [](void *mem)
+            -> void * { return new (mem) hkbFootIkControlsModifier(); }}},
+      {"hkbFootIkModifierLeg",
+       {0, 160,
+        [](void *mem) -> void * { return new (mem) hkbFootIkModifierLeg(); }}},
+      {"hkbFootIkModifierInternalLegData",
+       {0, 32,
+        [](void *mem) -> void
+                          * {
+                            return new (mem) hkbFootIkModifierInternalLegData();
+                          }}},
+      {"hkbFootIkModifier",
+       {4294967295, 208,
+        [](void *mem) -> void * { return new (mem) hkbFootIkModifier(); }}},
+      {"hkbGeneratorTransitionEffect",
+       {4294967295, 92,
+        [](void *mem)
+            -> void * { return new (mem) hkbGeneratorTransitionEffect(); }}},
+      {"hkbGeneratorTransitionEffectInternalState",
+       {4294967295, 32,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbGeneratorTransitionEffectInternalState();
+                          }}},
+      {"hkbGetHandleOnBoneModifier",
+       {4294967295, 56,
+        [](void *mem)
+            -> void * { return new (mem) hkbGetHandleOnBoneModifier(); }}},
+      {"hkbGetUpModifier",
+       {4294967295, 96,
+        [](void *mem) -> void * { return new (mem) hkbGetUpModifier(); }}},
+      {"hkbGetUpModifierInternalState",
+       {4294967295, 20,
+        [](void *mem)
+            -> void * { return new (mem) hkbGetUpModifierInternalState(); }}},
+      {"hkbGetWorldFromModelModifier",
+       {4294967295, 80,
+        [](void *mem)
+            -> void * { return new (mem) hkbGetWorldFromModelModifier(); }}},
+      {"hkbGetWorldFromModelModifierInternalState",
+       {4294967295, 48,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbGetWorldFromModelModifierInternalState();
+                          }}},
+      {"hkbHandIkControlData",
+       {0, 80,
+        [](void *mem) -> void * { return new (mem) hkbHandIkControlData(); }}},
+      {"hkbHandIkControlsModifierHand",
+       {0, 96,
+        [](void *mem)
+            -> void * { return new (mem) hkbHandIkControlsModifierHand(); }}},
+      {"hkbHandIkControlsModifier",
+       {4294967295, 56,
+        [](void *mem)
+            -> void * { return new (mem) hkbHandIkControlsModifier(); }}},
+      {"hkbHandIkModifierHand",
+       {0, 96,
+        [](void *mem) -> void * { return new (mem) hkbHandIkModifierHand(); }}},
+      {"hkbHandIkModifier",
+       {4294967295, 72,
+        [](void *mem) -> void * { return new (mem) hkbHandIkModifier(); }}},
+      {"hkbIntEventPayload",
+       {4294967295, 12,
+        [](void *mem) -> void * { return new (mem) hkbIntEventPayload(); }}},
+      {"hkbIntVariableSequencedDataSample",
+       {0, 8,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbIntVariableSequencedDataSample();
+                          }}},
+      {"hkbIntVariableSequencedData",
+       {4294967295, 24,
+        [](void *mem)
+            -> void * { return new (mem) hkbIntVariableSequencedData(); }}},
+      {"hkbJigglerGroup",
+       {4294967295, 60,
+        [](void *mem) -> void * { return new (mem) hkbJigglerGroup(); }}},
+      {"hkbJigglerModifier",
+       {4294967295, 92,
+        [](void *mem) -> void * { return new (mem) hkbJigglerModifier(); }}},
+      {"hkbJigglerModifierInternalState",
+       {4294967295, 40,
+        [](void *mem)
+            -> void * { return new (mem) hkbJigglerModifierInternalState(); }}},
+      {"hkbKeyframeBonesModifierKeyframeInfo",
+       {0, 48,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbKeyframeBonesModifierKeyframeInfo();
+                          }}},
+      {"hkbKeyframeBonesModifier",
+       {4294967295, 60,
+        [](void *mem)
+            -> void * { return new (mem) hkbKeyframeBonesModifier(); }}},
+      {"hkbLookAtModifier",
+       {4294967295, 208,
+        [](void *mem) -> void * { return new (mem) hkbLookAtModifier(); }}},
+      {"hkbLookAtModifierInternalState",
+       {4294967295, 48,
+        [](void *mem)
+            -> void * { return new (mem) hkbLookAtModifierInternalState(); }}},
+      {"hkbManualSelectorGenerator",
+       {4294967295, 56,
+        [](void *mem)
+            -> void * { return new (mem) hkbManualSelectorGenerator(); }}},
+      {"hkbManualSelectorGeneratorInternalState",
+       {4294967295, 12,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbManualSelectorGeneratorInternalState();
+                          }}},
+      {"hkbMirrorModifier",
+       {4294967295, 48,
+        [](void *mem) -> void * { return new (mem) hkbMirrorModifier(); }}},
+      {"hkbModifierGenerator",
+       {4294967295, 48,
+        [](void *mem) -> void * { return new (mem) hkbModifierGenerator(); }}},
+      {"hkbModifierList",
+       {4294967295, 56,
+        [](void *mem) -> void * { return new (mem) hkbModifierList(); }}},
+      {"hkbMoveCharacterModifier",
+       {4294967295, 80,
+        [](void *mem)
+            -> void * { return new (mem) hkbMoveCharacterModifier(); }}},
+      {"hkbMoveCharacterModifierInternalState",
+       {4294967295, 12,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbMoveCharacterModifierInternalState();
+                          }}},
+      {"hkbNamedEventPayload",
+       {4294967295, 12,
+        [](void *mem) -> void * { return new (mem) hkbNamedEventPayload(); }}},
+      {"hkbNamedIntEventPayload",
+       {4294967295, 16,
+        [](void *mem)
+            -> void * { return new (mem) hkbNamedIntEventPayload(); }}},
+      {"hkbNamedRealEventPayload",
+       {4294967295, 16,
+        [](void *mem)
+            -> void * { return new (mem) hkbNamedRealEventPayload(); }}},
+      {"hkbNamedStringEventPayload",
+       {4294967295, 16,
+        [](void *mem)
+            -> void * { return new (mem) hkbNamedStringEventPayload(); }}},
+      {"hkbPoseMatchingGenerator",
+       {4294967295, 208,
+        [](void *mem)
+            -> void * { return new (mem) hkbPoseMatchingGenerator(); }}},
+      {"hkbPoseMatchingGeneratorInternalState",
+       {4294967295, 28,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbPoseMatchingGeneratorInternalState();
+                          }}},
+      {"hkbRegisteredGenerator",
+       {4294967295, 64,
+        [](void *mem)
+            -> void * { return new (mem) hkbRegisteredGenerator(); }}},
+      {"hkbPositionRelativeSelectorGenerator",
+       {4294967295, 272,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbPositionRelativeSelectorGenerator();
+                          }}},
+      {"hkbPositionRelativeSelectorGeneratorInternalState",
+       {4294967295, 128,
+        [](void *mem)
+            -> void
+                * {
+                  return new (mem)
+                      hkbPositionRelativeSelectorGeneratorInternalState();
+                }}},
+      {"hkbPoweredRagdollControlData",
+       {0, 32,
+        [](void *mem)
+            -> void * { return new (mem) hkbPoweredRagdollControlData(); }}},
+      {"hkbWorldFromModelModeData",
+       {0, 8,
+        [](void *mem)
+            -> void * { return new (mem) hkbWorldFromModelModeData(); }}},
+      {"hkbPoweredRagdollControlsModifier",
+       {4294967295, 96,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbPoweredRagdollControlsModifier();
+                          }}},
+      {"hkbProxyModifierProxyInfo",
+       {0, 80,
+        [](void *mem)
+            -> void * { return new (mem) hkbProxyModifierProxyInfo(); }}},
+      {"hkbProxyModifier",
+       {4294967295, 256,
+        [](void *mem) -> void * { return new (mem) hkbProxyModifier(); }}},
+      {"hkbRealEventPayload",
+       {4294967295, 12,
+        [](void *mem) -> void * { return new (mem) hkbRealEventPayload(); }}},
+      {"hkbRealVariableSequencedDataSample",
+       {0, 8,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbRealVariableSequencedDataSample();
+                          }}},
+      {"hkbRealVariableSequencedData",
+       {4294967295, 24,
+        [](void *mem)
+            -> void * { return new (mem) hkbRealVariableSequencedData(); }}},
+      {"hkbReferencePoseGenerator",
+       {4294967295, 44,
+        [](void *mem)
+            -> void * { return new (mem) hkbReferencePoseGenerator(); }}},
+      {"hkaKeyFrameHierarchyUtilityControlData",
+       {0, 48,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkaKeyFrameHierarchyUtilityControlData();
+                          }}},
+      {"hkbRigidBodyRagdollControlData",
+       {0, 64,
+        [](void *mem)
+            -> void * { return new (mem) hkbRigidBodyRagdollControlData(); }}},
+      {"hkbRigidBodyRagdollControlsModifier",
+       {4294967295, 128,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbRigidBodyRagdollControlsModifier();
+                          }}},
+      {"hkbRotateCharacterModifier",
+       {4294967295, 96,
+        [](void *mem)
+            -> void * { return new (mem) hkbRotateCharacterModifier(); }}},
+      {"hkbRotateCharacterModifierInternalState",
+       {4294967295, 12,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbRotateCharacterModifierInternalState();
+                          }}},
+      {"hkbSenseHandleModifierRange",
+       {0, 20,
+        [](void *mem)
+            -> void * { return new (mem) hkbSenseHandleModifierRange(); }}},
+      {"hkbSenseHandleModifier",
+       {4294967295, 160,
+        [](void *mem)
+            -> void * { return new (mem) hkbSenseHandleModifier(); }}},
+      {"hkbSequenceStringData",
+       {4294967295, 32,
+        [](void *mem) -> void * { return new (mem) hkbSequenceStringData(); }}},
+      {"hkbSequence",
+       {4294967295, 168,
+        [](void *mem) -> void * { return new (mem) hkbSequence(); }}},
+      {"hkbSequenceInternalState",
+       {4294967295, 64,
+        [](void *mem)
+            -> void * { return new (mem) hkbSequenceInternalState(); }}},
+      {"hkbSetWorldFromModelModifier",
+       {4294967295, 96,
+        [](void *mem)
+            -> void * { return new (mem) hkbSetWorldFromModelModifier(); }}},
+      {"hkbSplinePathGenerator",
+       {4294967295, 256,
+        [](void *mem)
+            -> void * { return new (mem) hkbSplinePathGenerator(); }}},
+      {"hkbSplinePathGeneratorInternalState",
+       {4294967295, 112,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbSplinePathGeneratorInternalState();
+                          }}},
+      {"hkbStateListener",
+       {4294967295, 8,
+        [](void *mem) -> void * { return new (mem) hkbStateListener(); }}},
+      {"hkbStateMachineTimeInterval",
+       {0, 16,
+        [](void *mem)
+            -> void * { return new (mem) hkbStateMachineTimeInterval(); }}},
+      {"hkbStateMachineTransitionInfo",
+       {0, 60,
+        [](void *mem)
+            -> void * { return new (mem) hkbStateMachineTransitionInfo(); }}},
+      {"hkbStateMachineTransitionInfoArray",
+       {4294967295, 20,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbStateMachineTransitionInfoArray();
+                          }}},
+      {"hkbStateMachineEventPropertyArray",
+       {4294967295, 20,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbStateMachineEventPropertyArray();
+                          }}},
+      {"hkbStateMachineStateInfo",
+       {4294967295, 72,
+        [](void *mem)
+            -> void * { return new (mem) hkbStateMachineStateInfo(); }}},
+      {"hkbStateChooser",
+       {0, 8, [](void *mem) -> void * { return new (mem) hkbStateChooser(); }}},
+      {"hkbStateMachine",
+       {4294967295, 180,
+        [](void *mem) -> void * { return new (mem) hkbStateMachine(); }}},
+      {"hkbStateMachineTransitionInfoReference",
+       {0, 6,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbStateMachineTransitionInfoReference();
+                          }}},
+      {"hkbStateMachineActiveTransitionInfo",
+       {0, 32,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbStateMachineActiveTransitionInfo();
+                          }}},
+      {"hkbStateMachineProspectiveTransitionInfo",
+       {0, 16,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbStateMachineProspectiveTransitionInfo();
+                          }}},
+      {"hkbStateMachineDelayedTransitionInfo",
+       {0, 24,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbStateMachineDelayedTransitionInfo();
+                          }}},
+      {"hkbStateMachineInternalState",
+       {4294967295, 80,
+        [](void *mem)
+            -> void * { return new (mem) hkbStateMachineInternalState(); }}},
+      {"hkbStringCondition",
+       {4294967295, 12,
+        [](void *mem) -> void * { return new (mem) hkbStringCondition(); }}},
+      {"hkbStringEventPayload",
+       {4294967295, 12,
+        [](void *mem) -> void * { return new (mem) hkbStringEventPayload(); }}},
+      {"hkbTimerModifier",
+       {4294967295, 60,
+        [](void *mem) -> void * { return new (mem) hkbTimerModifier(); }}},
+      {"hkbTimerModifierInternalState",
+       {4294967295, 12,
+        [](void *mem)
+            -> void * { return new (mem) hkbTimerModifierInternalState(); }}},
+      {"hkbTransformVectorModifier",
+       {4294967295, 128,
+        [](void *mem)
+            -> void * { return new (mem) hkbTransformVectorModifier(); }}},
+      {"hkbTransformVectorModifierInternalState",
+       {4294967295, 32,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbTransformVectorModifierInternalState();
+                          }}},
+      {"hkbTwistModifier",
+       {4294967295, 112,
+        [](void *mem) -> void * { return new (mem) hkbTwistModifier(); }}},
+      {"hkbAlignBoneModifier",
+       {4294967295, 128,
+        [](void *mem) -> void * { return new (mem) hkbAlignBoneModifier(); }}},
+      {"hkbAnimatedSkeletonGenerator",
+       {4294967295, 44,
+        [](void *mem)
+            -> void * { return new (mem) hkbAnimatedSkeletonGenerator(); }}},
+      {"hkbAuxiliaryNodeInfo",
+       {4294967295, 28,
+        [](void *mem) -> void * { return new (mem) hkbAuxiliaryNodeInfo(); }}},
+      {"hkbBalanceModifierStepInfo",
+       {0, 8,
+        [](void *mem)
+            -> void * { return new (mem) hkbBalanceModifierStepInfo(); }}},
+      {"hkbBalanceModifier",
+       {4294967295, 92,
+        [](void *mem) -> void * { return new (mem) hkbBalanceModifier(); }}},
+      {"hkbRadialSelectorGeneratorGeneratorInfo",
+       {0, 12,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbRadialSelectorGeneratorGeneratorInfo();
+                          }}},
+      {"hkbRadialSelectorGeneratorGeneratorPair",
+       {0, 32,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbRadialSelectorGeneratorGeneratorPair();
+                          }}},
+      {"hkbRadialSelectorGenerator",
+       {4294967295, 76,
+        [](void *mem)
+            -> void * { return new (mem) hkbRadialSelectorGenerator(); }}},
+      {"hkbCheckBalanceModifier",
+       {4294967295, 160,
+        [](void *mem)
+            -> void * { return new (mem) hkbCheckBalanceModifier(); }}},
+      {"hkbBalanceRadialSelectorGenerator",
+       {4294967295, 88,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbBalanceRadialSelectorGenerator();
+                          }}},
+      {"hkbBehaviorEventsInfo",
+       {4294967295, 32,
+        [](void *mem) -> void * { return new (mem) hkbBehaviorEventsInfo(); }}},
+      {"hkbBehaviorGraphInternalStateInfo",
+       {4294967295, 56,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbBehaviorGraphInternalStateInfo();
+                          }}},
+      {"hkbBehaviorInfoIdToNamePair",
+       {0, 12,
+        [](void *mem)
+            -> void * { return new (mem) hkbBehaviorInfoIdToNamePair(); }}},
+      {"hkbBehaviorInfo",
+       {4294967295, 32,
+        [](void *mem) -> void * { return new (mem) hkbBehaviorInfo(); }}},
+      {"hkbCameraShakeEventPayload",
+       {4294967295, 16,
+        [](void *mem)
+            -> void * { return new (mem) hkbCameraShakeEventPayload(); }}},
+      {"hkbCatchFallModifierHand",
+       {0, 6,
+        [](void *mem)
+            -> void * { return new (mem) hkbCatchFallModifierHand(); }}},
+      {"hkbCatchFallModifier",
+       {4294967295, 240,
+        [](void *mem) -> void * { return new (mem) hkbCatchFallModifier(); }}},
+      {"hkbCharacterAddedInfo",
+       {4294967295, 96,
+        [](void *mem) -> void * { return new (mem) hkbCharacterAddedInfo(); }}},
+      {"hkbCharacterControlCommand",
+       {4294967295, 24,
+        [](void *mem)
+            -> void * { return new (mem) hkbCharacterControlCommand(); }}},
+      {"hkbCharacterInfo",
+       {4294967295, 24,
+        [](void *mem) -> void * { return new (mem) hkbCharacterInfo(); }}},
+      {"hkbCharacterSkinInfo",
+       {4294967295, 40,
+        [](void *mem) -> void * { return new (mem) hkbCharacterSkinInfo(); }}},
+      {"hkbCharacterSteppedInfo",
+       {4294967295, 112,
+        [](void *mem)
+            -> void * { return new (mem) hkbCharacterSteppedInfo(); }}},
+      {"hkbCheckRagdollSpeedModifier",
+       {4294967295, 60,
+        [](void *mem)
+            -> void * { return new (mem) hkbCheckRagdollSpeedModifier(); }}},
+      {"hkbClientCharacterState",
+       {4294967295, 208,
+        [](void *mem)
+            -> void * { return new (mem) hkbClientCharacterState(); }}},
+      {"hkbComputeWorldFromModelModifier",
+       {4294967295, 52,
+        [](void *mem) -> void
+                          * {
+                            return new (mem) hkbComputeWorldFromModelModifier();
+                          }}},
+      {"hkbTarget",
+       {4294967295, 80,
+        [](void *mem) -> void * { return new (mem) hkbTarget(); }}},
+      {"hkbConstrainRigidBodyModifier",
+       {4294967295, 64,
+        [](void *mem)
+            -> void * { return new (mem) hkbConstrainRigidBodyModifier(); }}},
+      {"hkbControlledReachModifier",
+       {4294967295, 84,
+        [](void *mem)
+            -> void * { return new (mem) hkbControlledReachModifier(); }}},
+      {"hkbCustomTestGeneratorStruck",
+       {0, 80,
+        [](void *mem)
+            -> void * { return new (mem) hkbCustomTestGeneratorStruck(); }}},
+      {"hkbCustomTestGenerator",
+       {4294967295, 400,
+        [](void *mem)
+            -> void * { return new (mem) hkbCustomTestGenerator(); }}},
+      {"hkbDemoConfigTerrainInfo",
+       {0, 20,
+        [](void *mem)
+            -> void * { return new (mem) hkbDemoConfigTerrainInfo(); }}},
+      {"hkbDemoConfigCharacterInfo",
+       {4294967295, 64,
+        [](void *mem)
+            -> void * { return new (mem) hkbDemoConfigCharacterInfo(); }}},
+      {"hkbDemoConfigStickVariableInfo",
+       {0, 24,
+        [](void *mem)
+            -> void * { return new (mem) hkbDemoConfigStickVariableInfo(); }}},
+      {"hkbDemoConfig",
+       {4294967295, 260,
+        [](void *mem) -> void * { return new (mem) hkbDemoConfig(); }}},
+      {"hkbEventRaisedInfo",
+       {4294967295, 32,
+        [](void *mem) -> void * { return new (mem) hkbEventRaisedInfo(); }}},
+      {"hkbFaceTargetModifier",
+       {4294967295, 56,
+        [](void *mem) -> void * { return new (mem) hkbFaceTargetModifier(); }}},
+      {"hkbGravityModifier",
+       {4294967295, 112,
+        [](void *mem) -> void * { return new (mem) hkbGravityModifier(); }}},
+      {"hkbHoldFromBlendingTransitionEffect",
+       {4294967295, 160,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbHoldFromBlendingTransitionEffect();
+                          }}},
+      {"hkbLinkedSymbolInfo",
+       {4294967295, 32,
+        [](void *mem) -> void * { return new (mem) hkbLinkedSymbolInfo(); }}},
+      {"hkbMoveBoneTowardTargetModifier",
+       {4294967295, 400,
+        [](void *mem)
+            -> void * { return new (mem) hkbMoveBoneTowardTargetModifier(); }}},
+      {"hkbParticleSystemEventPayload",
+       {4294967295, 64,
+        [](void *mem)
+            -> void * { return new (mem) hkbParticleSystemEventPayload(); }}},
+      {"hkbGeneratorOutputListener",
+       {0, 8,
+        [](void *mem)
+            -> void * { return new (mem) hkbGeneratorOutputListener(); }}},
+      {"hkbPoseStoringGeneratorOutputListenerStoredPose",
+       {4294967295, 96,
+        [](void *mem)
+            -> void
+                * {
+                  return new (mem)
+                      hkbPoseStoringGeneratorOutputListenerStoredPose();
+                }}},
+      {"hkbPoseStoringGeneratorOutputListener",
+       {4294967295, 28,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbPoseStoringGeneratorOutputListener();
+                          }}},
+      {"hkbRaiseEventCommand",
+       {4294967295, 24,
+        [](void *mem) -> void * { return new (mem) hkbRaiseEventCommand(); }}},
+      {"hkbReachModifierHand",
+       {0, 48,
+        [](void *mem) -> void * { return new (mem) hkbReachModifierHand(); }}},
+      {"hkbReachModifier",
+       {4294967295, 104,
+        [](void *mem) -> void * { return new (mem) hkbReachModifier(); }}},
+      {"hkbReachTowardTargetModifierHand",
+       {0, 4,
+        [](void *mem) -> void
+                          * {
+                            return new (mem) hkbReachTowardTargetModifierHand();
+                          }}},
+      {"hkbReachTowardTargetModifier",
+       {4294967295, 128,
+        [](void *mem)
+            -> void * { return new (mem) hkbReachTowardTargetModifier(); }}},
+      {"hkbSetBehaviorCommand",
+       {4294967295, 48,
+        [](void *mem) -> void * { return new (mem) hkbSetBehaviorCommand(); }}},
+      {"hkbSetLocalTimeOfClipGeneratorCommand",
+       {4294967295, 24,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbSetLocalTimeOfClipGeneratorCommand();
+                          }}},
+      {"hkbSetNodePropertyCommand",
+       {4294967295, 32,
+        [](void *mem)
+            -> void * { return new (mem) hkbSetNodePropertyCommand(); }}},
+      {"hkbSetWordVariableCommand",
+       {4294967295, 64,
+        [](void *mem)
+            -> void * { return new (mem) hkbSetWordVariableCommand(); }}},
+      {"hkbSimulationControlCommand",
+       {4294967295, 12,
+        [](void *mem)
+            -> void * { return new (mem) hkbSimulationControlCommand(); }}},
+      {"hkbSimulationStateInfo",
+       {4294967295, 12,
+        [](void *mem)
+            -> void * { return new (mem) hkbSimulationStateInfo(); }}},
+      {"hkbStateDependentModifier",
+       {4294967295, 72,
+        [](void *mem)
+            -> void * { return new (mem) hkbStateDependentModifier(); }}},
+      {"hkbTargetRigidBodyModifier",
+       {4294967295, 208,
+        [](void *mem)
+            -> void * { return new (mem) hkbTargetRigidBodyModifier(); }}},
+      {"hkbTestStateChooser",
+       {4294967295, 20,
+        [](void *mem) -> void * { return new (mem) hkbTestStateChooser(); }}},
+      {"BGSGamebryoSequenceGenerator",
+       {4294967295, 72,
+        [](void *mem)
+            -> void * { return new (mem) BGSGamebryoSequenceGenerator(); }}},
+      {"BSBoneSwitchGeneratorBoneData",
+       {4294967295, 48,
+        [](void *mem)
+            -> void * { return new (mem) BSBoneSwitchGeneratorBoneData(); }}},
+      {"BSBoneSwitchGenerator",
+       {4294967295, 64,
+        [](void *mem) -> void * { return new (mem) BSBoneSwitchGenerator(); }}},
+      {"BSComputeAddBoneAnimModifier",
+       {4294967295, 112,
+        [](void *mem)
+            -> void * { return new (mem) BSComputeAddBoneAnimModifier(); }}},
+      {"BSCyclicBlendTransitionGenerator",
+       {4294967295, 112,
+        [](void *mem) -> void
+                          * {
+                            return new (mem) BSCyclicBlendTransitionGenerator();
+                          }}},
+      {"BSDecomposeVectorModifier",
+       {4294967295, 80,
+        [](void *mem)
+            -> void * { return new (mem) BSDecomposeVectorModifier(); }}},
+      {"BSDirectAtModifier",
+       {4294967295, 176,
+        [](void *mem) -> void * { return new (mem) BSDirectAtModifier(); }}},
+      {"BSDistTriggerModifier",
+       {4294967295, 80,
+        [](void *mem) -> void * { return new (mem) BSDistTriggerModifier(); }}},
+      {"BSEventEveryNEventsModifier",
+       {4294967295, 72,
+        [](void *mem)
+            -> void * { return new (mem) BSEventEveryNEventsModifier(); }}},
+      {"BSEventOnDeactivateModifier",
+       {4294967295, 52,
+        [](void *mem)
+            -> void * { return new (mem) BSEventOnDeactivateModifier(); }}},
+      {"BSEventOnFalseToTrueModifier",
+       {4294967295, 84,
+        [](void *mem)
+            -> void * { return new (mem) BSEventOnFalseToTrueModifier(); }}},
+      {"BSGetTimeStepModifier",
+       {4294967295, 48,
+        [](void *mem) -> void * { return new (mem) BSGetTimeStepModifier(); }}},
+      {"BSIStateManagerModifierBSIStateManagerStateListener",
+       {4294967295, 12,
+        [](void *mem)
+            -> void
+                * {
+                  return new (mem)
+                      BSIStateManagerModifierBSIStateManagerStateListener();
+                }}},
+      {"BSIStateManagerModifierBSiStateData",
+       {0, 12,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                BSIStateManagerModifierBSiStateData();
+                          }}},
+      {"BSIStateManagerModifier",
+       {4294967295, 72,
+        [](void *mem)
+            -> void * { return new (mem) BSIStateManagerModifier(); }}},
+      {"BSInterpValueModifier",
+       {4294967295, 64,
+        [](void *mem) -> void * { return new (mem) BSInterpValueModifier(); }}},
+      {"BSIsActiveModifier",
+       {4294967295, 56,
+        [](void *mem) -> void * { return new (mem) BSIsActiveModifier(); }}},
+      {"BSLimbIKModifier",
+       {4294967295, 76,
+        [](void *mem) -> void * { return new (mem) BSLimbIKModifier(); }}},
+      {"BSLookAtModifierBoneData",
+       {0, 64,
+        [](void *mem)
+            -> void * { return new (mem) BSLookAtModifierBoneData(); }}},
+      {"BSLookAtModifier",
+       {4294967295, 160,
+        [](void *mem) -> void * { return new (mem) BSLookAtModifier(); }}},
+      {"BSModifyOnceModifier",
+       {4294967295, 80,
+        [](void *mem) -> void * { return new (mem) BSModifyOnceModifier(); }}},
+      {"BSOffsetAnimationGenerator",
+       {4294967295, 128,
+        [](void *mem)
+            -> void * { return new (mem) BSOffsetAnimationGenerator(); }}},
+      {"BSPassByTargetTriggerModifier",
+       {4294967295, 112,
+        [](void *mem)
+            -> void * { return new (mem) BSPassByTargetTriggerModifier(); }}},
+      {"BSRagdollContactListenerModifier",
+       {4294967295, 76,
+        [](void *mem) -> void
+                          * {
+                            return new (mem) BSRagdollContactListenerModifier();
+                          }}},
+      {"BSSpeedSamplerModifier",
+       {4294967295, 60,
+        [](void *mem)
+            -> void * { return new (mem) BSSpeedSamplerModifier(); }}},
+      {"BSSynchronizedClipGenerator",
+       {4294967295, 256,
+        [](void *mem)
+            -> void * { return new (mem) BSSynchronizedClipGenerator(); }}},
+      {"BSTimerModifier",
+       {4294967295, 64,
+        [](void *mem) -> void * { return new (mem) BSTimerModifier(); }}},
+      {"BSTweenerModifier",
+       {4294967295, 176,
+        [](void *mem) -> void * { return new (mem) BSTweenerModifier(); }}},
+      {"BSiStateTaggingGenerator",
+       {4294967295, 64,
+        [](void *mem)
+            -> void * { return new (mem) BSiStateTaggingGenerator(); }}},
+      {"hkAabbHalf",
+       {0, 16, [](void *mem) -> void * { return new (mem) hkAabbHalf(); }}},
+      {"hkAabbUint32",
+       {0, 32, [](void *mem) -> void * { return new (mem) hkAabbUint32(); }}},
+      {"hkArrayTypeAttribute",
+       {0, 1,
+        [](void *mem) -> void * { return new (mem) hkArrayTypeAttribute(); }}},
+      {"hkBitField",
+       {0, 16, [](void *mem) -> void * { return new (mem) hkBitField(); }}},
+      {"hkClassEnumItem",
+       {0, 8, [](void *mem) -> void * { return new (mem) hkClassEnumItem(); }}},
+      {"hkCustomAttributesAttribute",
+       {0, 12,
+        [](void *mem)
+            -> void * { return new (mem) hkCustomAttributesAttribute(); }}},
+      {"hkCustomAttributes",
+       {0, 8,
+        [](void *mem) -> void * { return new (mem) hkCustomAttributes(); }}},
+      {"hkClassEnum",
+       {0, 20, [](void *mem) -> void * { return new (mem) hkClassEnum(); }}},
+      {"hkClassMember",
+       {0, 24, [](void *mem) -> void * { return new (mem) hkClassMember(); }}},
+      {"hkClass",
+       {0, 48, [](void *mem) -> void * { return new (mem) hkClass(); }}},
+      {"hkColor",
+       {0, 1, [](void *mem) -> void * { return new (mem) hkColor(); }}},
+      {"hkContactPointMaterial",
+       {0, 8,
+        [](void *mem)
+            -> void * { return new (mem) hkContactPointMaterial(); }}},
+      {"hkDataObjectTypeAttribute",
+       {0, 4,
+        [](void *mem)
+            -> void * { return new (mem) hkDataObjectTypeAttribute(); }}},
+      {"hkDescriptionAttribute",
+       {0, 4,
+        [](void *mem)
+            -> void * { return new (mem) hkDescriptionAttribute(); }}},
+      {"hkDocumentationAttribute",
+       {0, 4,
+        [](void *mem)
+            -> void * { return new (mem) hkDocumentationAttribute(); }}},
+      {"hkGeometryTriangle",
+       {0, 16,
+        [](void *mem) -> void * { return new (mem) hkGeometryTriangle(); }}},
+      {"hkGeometry",
+       {0, 24, [](void *mem) -> void * { return new (mem) hkGeometry(); }}},
+      {"hkGizmoAttribute",
+       {0, 12,
+        [](void *mem) -> void * { return new (mem) hkGizmoAttribute(); }}},
+      {"hkHalf8",
+       {0, 16, [](void *mem) -> void * { return new (mem) hkHalf8(); }}},
+      {"hkLinkAttribute",
+       {0, 1, [](void *mem) -> void * { return new (mem) hkLinkAttribute(); }}},
+      {"hkMemoryTrackerAttribute",
+       {0, 1,
+        [](void *mem)
+            -> void * { return new (mem) hkMemoryTrackerAttribute(); }}},
+      {"hkModelerNodeTypeAttribute",
+       {0, 1,
+        [](void *mem)
+            -> void * { return new (mem) hkModelerNodeTypeAttribute(); }}},
+      {"hkPackedVector3",
+       {0, 8, [](void *mem) -> void * { return new (mem) hkPackedVector3(); }}},
+      {"hkPostFinishAttribute",
+       {0, 4,
+        [](void *mem) -> void * { return new (mem) hkPostFinishAttribute(); }}},
+      {"hkQTransform",
+       {0, 32, [](void *mem) -> void * { return new (mem) hkQTransform(); }}},
+      {"hkRangeInt32Attribute",
+       {0, 16,
+        [](void *mem) -> void * { return new (mem) hkRangeInt32Attribute(); }}},
+      {"hkRangeRealAttribute",
+       {0, 16,
+        [](void *mem) -> void * { return new (mem) hkRangeRealAttribute(); }}},
+      {"hkReflectedFileAttribute",
+       {0, 4,
+        [](void *mem)
+            -> void * { return new (mem) hkReflectedFileAttribute(); }}},
+      {"hkSemanticsAttribute",
+       {0, 1,
+        [](void *mem) -> void * { return new (mem) hkSemanticsAttribute(); }}},
+      {"hkSphere",
+       {0, 16, [](void *mem) -> void * { return new (mem) hkSphere(); }}},
+      {"hkTraceStreamTitle",
+       {0, 32,
+        [](void *mem) -> void * { return new (mem) hkTraceStreamTitle(); }}},
+      {"hkUiAttribute",
+       {0, 20, [](void *mem) -> void * { return new (mem) hkUiAttribute(); }}},
+      {"hkMonitorStreamFrameInfo",
+       {0, 36,
+        [](void *mem)
+            -> void * { return new (mem) hkMonitorStreamFrameInfo(); }}},
+      {"hkMonitorStreamStringMapStringMap",
+       {0, 16,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkMonitorStreamStringMapStringMap();
+                          }}},
+      {"hkMonitorStreamStringMap",
+       {0, 12,
+        [](void *mem)
+            -> void * { return new (mem) hkMonitorStreamStringMap(); }}},
+      {"hkPackfileHeader",
+       {0, 64,
+        [](void *mem) -> void * { return new (mem) hkPackfileHeader(); }}},
+      {"hkPackfileSectionHeader",
+       {0, 48,
+        [](void *mem)
+            -> void * { return new (mem) hkPackfileSectionHeader(); }}},
+      {"hkRootLevelContainerNamedVariant",
+       {0, 12,
+        [](void *mem) -> void
+                          * {
+                            return new (mem) hkRootLevelContainerNamedVariant();
+                          }}},
+      {"hkRootLevelContainer",
+       {0, 12,
+        [](void *mem) -> void * { return new (mem) hkRootLevelContainer(); }}},
+      {"hkMeshSection",
+       {0, 40, [](void *mem) -> void * { return new (mem) hkMeshSection(); }}},
+      {"hkpMassProperties",
+       {0, 80,
+        [](void *mem) -> void * { return new (mem) hkpMassProperties(); }}},
+      {"hkpWeldingUtility",
+       {0, 1,
+        [](void *mem) -> void * { return new (mem) hkpWeldingUtility(); }}},
+      {"hkpCenterOfMassChangerModifierConstraintAtom",
+       {0, 64,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpCenterOfMassChangerModifierConstraintAtom();
+                          }}},
+      {"hkpIgnoreModifierConstraintAtom",
+       {0, 32,
+        [](void *mem)
+            -> void * { return new (mem) hkpIgnoreModifierConstraintAtom(); }}},
+      {"hkpMassChangerModifierConstraintAtom",
+       {0, 64,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpMassChangerModifierConstraintAtom();
+                          }}},
+      {"hkpMovingSurfaceModifierConstraintAtom",
+       {0, 48,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpMovingSurfaceModifierConstraintAtom();
+                          }}},
+      {"hkpOverwritePivotConstraintAtom",
+       {0, 4,
+        [](void *mem)
+            -> void * { return new (mem) hkpOverwritePivotConstraintAtom(); }}},
+      {"hkpSoftContactModifierConstraintAtom",
+       {0, 48,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpSoftContactModifierConstraintAtom();
+                          }}},
+      {"hkpViscousSurfaceModifierConstraintAtom",
+       {0, 32,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkpViscousSurfaceModifierConstraintAtom();
+                          }}},
+      {"hkpMoppCodeReindexedTerminal",
+       {0, 8,
+        [](void *mem)
+            -> void * { return new (mem) hkpMoppCodeReindexedTerminal(); }}},
+      {"hkaQuantizedAnimationTrackCompressionParams",
+       {0, 16,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkaQuantizedAnimationTrackCompressionParams();
+                          }}},
+      {"hkaSplineCompressedAnimationAnimationCompressionParams",
+       {0, 4,
+        [](void *mem)
+            -> void
+                * {
+                  return new (mem)
+                      hkaSplineCompressedAnimationAnimationCompressionParams();
+                }}},
+      {"hkaSplineCompressedAnimationTrackCompressionParams",
+       {0, 28,
+        [](void *mem)
+            -> void
+                * {
+                  return new (mem)
+                      hkaSplineCompressedAnimationTrackCompressionParams();
+                }}},
+      {"hkaWaveletCompressedAnimationCompressionParams",
+       {0, 36,
+        [](void *mem)
+            -> void
+                * {
+                  return new (mem)
+                      hkaWaveletCompressedAnimationCompressionParams();
+                }}},
+      {"hkaKeyFrameHierarchyUtility",
+       {0, 1,
+        [](void *mem)
+            -> void * { return new (mem) hkaKeyFrameHierarchyUtility(); }}},
+      {"hkbBlendCurveUtils",
+       {0, 1,
+        [](void *mem) -> void * { return new (mem) hkbBlendCurveUtils(); }}},
+      {"hkbContext",
+       {0, 40, [](void *mem) -> void * { return new (mem) hkbContext(); }}},
+      {"hkbDefaultMessageLog",
+       {0, 1,
+        [](void *mem) -> void * { return new (mem) hkbDefaultMessageLog(); }}},
+      {"hkbMessageLog",
+       {0, 8, [](void *mem) -> void * { return new (mem) hkbMessageLog(); }}},
+      {"hkbStateMachineNestedStateMachineData",
+       {0, 8,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkbStateMachineNestedStateMachineData();
+                          }}},
+      {"hkbWorldEnums",
+       {0, 1, [](void *mem) -> void * { return new (mem) hkbWorldEnums(); }}},
+      {"hkVariableTweakingHelperBoolVariableInfo",
+       {0, 8,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkVariableTweakingHelperBoolVariableInfo();
+                          }}},
+      {"hkVariableTweakingHelperVector4VariableInfo",
+       {0, 24,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkVariableTweakingHelperVector4VariableInfo();
+                          }}},
+      {"hkVariableTweakingHelperRealVariableInfo",
+       {0, 12,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkVariableTweakingHelperRealVariableInfo();
+                          }}},
+      {"hkVariableTweakingHelperIntVariableInfo",
+       {0, 12,
+        [](void *mem) -> void
+                          * {
+                            return new (mem)
+                                hkVariableTweakingHelperIntVariableInfo();
+                          }}},
+      {"hkVariableTweakingHelper",
+       {0, 100,
+        [](void *mem)
+            -> void * { return new (mem) hkVariableTweakingHelper(); }}},
+      {"hkpCollidableCollidableFilter",
+       {0, 4,
+        [](void *mem)
+            -> void * { return new (mem) hkpCollidableCollidableFilter(); }}},
+      {"hkpPhantomCallbackShape",
+       {0, 16,
+        [](void *mem)
+            -> void * { return new (mem) hkpPhantomCallbackShape(); }}},
+      {"hkpRayCollidableFilter",
+       {0, 4,
+        [](void *mem)
+            -> void * { return new (mem) hkpRayCollidableFilter(); }}},
+      {"hkpRayShapeCollectionFilter",
+       {0, 4,
+        [](void *mem)
+            -> void * { return new (mem) hkpRayShapeCollectionFilter(); }}},
+      {"hkpShapeCollectionFilter",
+       {0, 4,
+        [](void *mem)
+            -> void * { return new (mem) hkpShapeCollectionFilter(); }}},
+      {"hkpShapeModifier",
+       {0, 8,
+        [](void *mem) -> void * { return new (mem) hkpShapeModifier(); }}},
+      {"hkpArrayAction",
+       {0, 36, [](void *mem) -> void * { return new (mem) hkpArrayAction(); }}},
+      {"hkpBreakableBody",
+       {0, 8,
+        [](void *mem) -> void * { return new (mem) hkpBreakableBody(); }}},
+  };
+
+  HavokUtils() = default;
+
+public:
+  static HavokUtils &getInstance() {
+    static HavokUtils instance;
+    return instance;
+  }
+
+  void *createInstance(std::string className, char *mem) {
+    auto it = typeinfos.find(className);
+    if (it != typeinfos.end()) {
+      char *src = mem;
+      auto size = it->second.size;
+      if (it->second.vtable) {
+        src += sizeof(void *);
+        size -= sizeof(void *);
+      }
+
+      char *dest = new char[size];
+
+      std::memcpy(dest, src, size);
+
+      auto instance = it->second.creator(mem);
+      std::memcpy(src, dest, size);
+      delete[] dest;
+      return instance;
+    }
+
+    std::cerr << "HavokUtils::createInstance: Unknown class name: " << className
+              << std::endl;
+    return nullptr;
+  }
+
+  bool hasVtable(std::string className) {
+    auto it = typeinfos.find(className);
+    if (it != typeinfos.end()) {
+      return it->second.vtable != 0;
+    }
+    return false;
+  }
+};
 
 #endif

@@ -132,8 +132,10 @@ public:
 					target += sections[sectionIndex]->absoluteDataStart;
 
 					auto className = reinterpret_cast<const char *>(raw_data + target);
-					if (has_vtable(className))
+					if (HavokUtils::getInstance().hasVtable(className)) {
 						fixup(offset, target);
+						HavokUtils::getInstance().createInstance(className, raw_data + target);
+					}
 					virtualFixupsStart += 12;
 				}
 			}
